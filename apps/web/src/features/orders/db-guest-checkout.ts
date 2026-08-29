@@ -8,7 +8,7 @@ import "server-only";
 import type { PaymentMethod } from "@prisma/client";
 import { BackendError } from "@/lib/db/errors";
 import { mapCustomer, mapOrder } from "@/lib/db/mappers";
-import { prisma } from "@/lib/db/prisma";
+import { interactiveTransactionOptions, prisma } from "@/lib/db/prisma";
 import { createOpaqueId } from "@/lib/id";
 import { normalizeIraqiPhone } from "@/lib/format/phone";
 import type { Order } from "@/types/order";
@@ -183,5 +183,5 @@ export async function dbPlaceGuestOrderAtomic(
       customer: mapCustomer(customerRow),
       customerCreated,
     };
-  });
+  }, interactiveTransactionOptions);
 }

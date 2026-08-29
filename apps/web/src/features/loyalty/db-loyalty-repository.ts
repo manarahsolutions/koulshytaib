@@ -11,7 +11,7 @@ import {
   mapLoyaltyAccount,
   mapLoyaltyTransaction,
 } from "@/lib/db/mappers";
-import { prisma } from "@/lib/db/prisma";
+import { interactiveTransactionOptions, prisma } from "@/lib/db/prisma";
 import { createOpaqueId } from "@/lib/id";
 import {
   DEFAULT_LOYALTY_CONFIG,
@@ -159,7 +159,7 @@ export async function dbAppendLoyaltyTransaction(input: {
       });
 
       return created;
-    });
+    }, interactiveTransactionOptions);
 
     return mapLoyaltyTransaction(row);
   } catch (error) {

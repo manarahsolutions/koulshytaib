@@ -34,7 +34,36 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const prisma = new PrismaClient();
+/**
+ * Match apps/web Prisma client: Neon pooler compat + interactive tx budgets.
+ * Default 5s timeout closes `tx` mid-callback over remote pooler RTTs (P2028).
+ */
+const interactiveTransactionOptions = {
+  maxWait: 15_000,
+  timeout: 30_000,
+} as const;
+
+function resolveDatabaseUrl(raw = process.env.DATABASE_URL): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    const normalized = raw.trim().replace(/^postgresql:/i, "http:");
+    const url = new URL(normalized);
+    if (url.hostname.includes("-pooler.")) {
+      if (!url.searchParams.has("pgbouncer")) {
+        url.searchParams.set("pgbouncer", "true");
+      }
+    }
+    return url.toString().replace(/^http:/i, "postgresql:");
+  } catch {
+    return raw.trim();
+  }
+}
+
+const databaseUrl = resolveDatabaseUrl();
+const prisma = new PrismaClient({
+  datasources: databaseUrl ? { db: { url: databaseUrl } } : undefined,
+  transactionOptions: interactiveTransactionOptions,
+});
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAIL: ${message}`);
@@ -151,7 +180,7 @@ async function main() {
     });
 
     return { order, customer, created };
-  });
+  }, interactiveTransactionOptions);
 
   assert(checkout.created, "new guest customer created");
   assert(checkout.order.items.length === 1, "order item snapshot");
@@ -199,7 +228,7 @@ async function main() {
       },
     });
     return customer;
-  });
+  }, interactiveTransactionOptions);
 
   const after = await prisma.customer.findUniqueOrThrow({
     where: { id: reuse.id },
@@ -226,7 +255,7 @@ async function main() {
         note: "verify:received→confirmed",
       },
     });
-  });
+  }, interactiveTransactionOptions);
 
   const reloaded = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
@@ -319,11 +348,17 @@ async function main() {
   console.log("\nAll Phase 19/20 runtime checks passed.");
 }
 
-main()
-  .catch((error) => {
+async function run() {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  })
-  .finally(async () => {
+    process.exitCode = 1;
+  } finally {
+    // Await disconnect after all work; never call process.exit mid-flight
+    // (races with open interactive transactions → P2028).
     await prisma.$disconnect();
-  });
+  }
+}
+
+void run();

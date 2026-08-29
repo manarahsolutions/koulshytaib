@@ -5,7 +5,7 @@
 import "server-only";
 import { BackendError } from "@/lib/db/errors";
 import { mapOffer } from "@/lib/db/mappers";
-import { prisma } from "@/lib/db/prisma";
+import { interactiveTransactionOptions, prisma } from "@/lib/db/prisma";
 import { createOpaqueId } from "@/lib/id";
 import type {
   CreateOfferInput,
@@ -153,7 +153,7 @@ export async function dbCreateOffer(input: CreateOfferInput): Promise<Offer> {
       },
       include: includeProducts(),
     });
-  });
+  }, interactiveTransactionOptions);
 
   return mapOffer(row);
 }
@@ -254,7 +254,7 @@ export async function dbUpdateOffer(
       },
       include: includeProducts(),
     });
-  });
+  }, interactiveTransactionOptions);
 
   return mapOffer(row);
 }

@@ -6,7 +6,7 @@
 import "server-only";
 import { BackendError } from "@/lib/db/errors";
 import { mapOrder } from "@/lib/db/mappers";
-import { prisma } from "@/lib/db/prisma";
+import { interactiveTransactionOptions, prisma } from "@/lib/db/prisma";
 import { createOpaqueId } from "@/lib/id";
 import { canTransitionOrderStatus } from "@/features/orders/order-transitions";
 import type { Order, OrderStatus } from "@/types/order";
@@ -113,7 +113,7 @@ export async function dbCreateOrder(input: DbPlaceOrderInput): Promise<Order> {
       include: orderInclude,
     });
     return order;
-  });
+  }, interactiveTransactionOptions);
   return mapOrder(row);
 }
 
@@ -148,7 +148,7 @@ export async function dbUpdateOrderStatus(
       where: { id: orderId },
       include: orderInclude,
     });
-  });
+  }, interactiveTransactionOptions);
 
   return mapOrder(row);
 }
