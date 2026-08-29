@@ -1,0 +1,224 @@
+/**
+ * كلشي طيب — Design Tokens
+ *
+ * Brand hex values below are INITIAL APPROXIMATIONS based on the provided
+ * brand board (PDF), not final extracted source brand files.
+ * Change brand primitives in one place; components must use semantic tokens.
+ *
+ * Prefer logical properties (inline-start/end) over physical left/right.
+ */
+
+:root {
+  /* =========================================================
+   * 0) Brand primitives — cream / raspberry / yellow / green only.
+   * No purple. Deep ink = darkened green (keeps --brand-navy name for
+   * existing utilities, but hue is green-family).
+   * ========================================================= */
+  --brand-raspberry: #c94a66;
+  --brand-yellow: #d4a84b;
+  --brand-green: #2a8a66;
+  --brand-cream: #fbf6eb;
+  /* Deep green ink (not purple) — text, inverse surfaces, chips */
+  --brand-navy: color-mix(in srgb, var(--brand-green) 42%, #0c1f18);
+
+  /* =========================================================
+   * 1) Semantic — Brand roles
+   * Primary = Raspberry · Secondary = Yellow · Contrast/ink = Green-deep
+   * ========================================================= */
+  --color-brand-primary: var(--brand-raspberry);
+  --color-brand-primary-hover: color-mix(
+    in srgb,
+    var(--brand-raspberry) 88%,
+    #000000
+  );
+  --color-brand-primary-active: color-mix(
+    in srgb,
+    var(--brand-raspberry) 78%,
+    #000000
+  );
+  --color-brand-secondary: var(--brand-yellow);
+  --color-brand-secondary-hover: color-mix(
+    in srgb,
+    var(--brand-yellow) 88%,
+    #000000
+  );
+  --color-brand-green: var(--brand-green);
+  --color-brand-navy: var(--brand-navy);
+
+  /* =========================================================
+   * 2) Surfaces (Cream-led)
+   * ========================================================= */
+  --color-background: var(--brand-cream);
+  --color-surface: color-mix(in srgb, var(--brand-cream) 94%, #e8dfd0);
+  --color-surface-warm: color-mix(in srgb, var(--brand-cream) 90%, #e6dcc8);
+  --color-surface-elevated: #fffcf7;
+  --color-surface-inverse: var(--brand-navy);
+
+  /* =========================================================
+   * 3) Text — green ink family
+   * ========================================================= */
+  --color-text: var(--brand-navy);
+  --color-text-muted: color-mix(in srgb, var(--brand-navy) 68%, #ffffff);
+  --color-text-subtle: color-mix(in srgb, var(--brand-navy) 48%, #ffffff);
+  --color-text-disabled: color-mix(in srgb, var(--brand-navy) 34%, #ffffff);
+
+  /* =========================================================
+   * 4) Borders
+   * ========================================================= */
+  --color-border: color-mix(in srgb, var(--brand-navy) 16%, transparent);
+  --color-border-soft: color-mix(in srgb, var(--brand-navy) 9%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--brand-navy) 28%, transparent);
+
+  /* =========================================================
+   * 5) On-color
+   * ========================================================= */
+  --color-on-primary: #ffffff;
+  --color-on-secondary: var(--brand-navy);
+  --color-on-dark: var(--brand-cream);
+  --color-on-green: #ffffff;
+
+  /* =========================================================
+   * 6) Functional
+   * ========================================================= */
+  --color-success: var(--brand-green);
+  --color-success-subtle: color-mix(in srgb, var(--brand-green) 14%, white);
+  --color-warning: var(--brand-yellow);
+  --color-warning-subtle: color-mix(in srgb, var(--brand-yellow) 22%, white);
+  --color-warning-text: var(--brand-navy);
+  --color-danger: color-mix(in srgb, var(--brand-raspberry) 88%, #000000);
+  --color-danger-hover: color-mix(in srgb, var(--brand-raspberry) 78%, #000000);
+  --color-danger-subtle: color-mix(in srgb, var(--brand-raspberry) 12%, white);
+  --color-info: var(--brand-green);
+  --color-info-subtle: color-mix(in srgb, var(--brand-green) 10%, white);
+
+  /* Focus ring */
+  --color-focus-ring: var(--brand-raspberry);
+
+  /* =========================================================
+   * 7) Typography
+   * Body/UI: Readex Pro (--font-readex-pro).
+   * Display/headings: Aref Ruqaa (--font-aref-ruqaa → --font-display).
+   * Swap faces via tokens only; do not hardcode in components.
+   * ========================================================= */
+  --font-family: var(
+    --font-readex-pro,
+    "Readex Pro",
+    "Segoe UI",
+    Tahoma,
+    "Noto Sans Arabic",
+    Arial,
+    sans-serif
+  );
+  --font-display: var(
+    --font-aref-ruqaa,
+    "Aref Ruqaa",
+    "Traditional Arabic",
+    serif
+  );
+  --font-sans: var(--font-family);
+  --font-arabic: var(--font-family);
+  --font-latin: var(--font-family);
+  --font-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+
+  /* Role sizes */
+  --text-display: 2.5rem; /* 40 */
+  --text-heading-xl: 2rem; /* 32 */
+  --text-heading-l: 1.625rem; /* 26 */
+  --text-heading-m: 1.375rem; /* 22 */
+  --text-heading-s: 1.125rem; /* 18 */
+  --text-body-l: 1.125rem; /* 18 */
+  --text-body-m: 1rem; /* 16 */
+  --text-body-s: 0.875rem; /* 14 */
+  --text-caption: 0.75rem; /* 12 */
+  --text-label: 0.8125rem; /* 13 */
+  --text-price: 1.125rem; /* 18 */
+
+  /* Arabic-friendly leading */
+  --leading-display: 1.25;
+  --leading-heading: 1.35;
+  --leading-body: 1.65;
+  --leading-caption: 1.45;
+  --leading-label: 1.3;
+  --leading-price: 1.2;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* =========================================================
+   * 8) Spacing — 4px scale
+   * ========================================================= */
+  --space-1: 0.25rem; /* 4 */
+  --space-2: 0.5rem; /* 8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.25rem; /* 20 */
+  --space-6: 1.5rem; /* 24 */
+  --space-8: 2rem; /* 32 */
+  --space-10: 2.5rem; /* 40 */
+  --space-12: 3rem; /* 48 */
+  --space-16: 4rem; /* 64 */
+  --space-20: 5rem; /* 80 */
+  --space-24: 6rem; /* 96 */
+
+  /* =========================================================
+   * 9) Radius — warm/modern, not childish
+   * ========================================================= */
+  --radius-sm: 0.5rem; /* 8 */
+  --radius-md: 0.75rem; /* 12 — softer hospitality cards */
+  --radius-lg: 1rem; /* 16 */
+  --radius-xl: 1.25rem; /* 20 */
+  --radius-2xl: 1.5rem; /* 24 */
+  --radius-full: 9999px;
+
+  /* =========================================================
+   * 10) Shadows — soft / subtle (prefer border when enough)
+   * ========================================================= */
+  --shadow-xs: 0 1px 2px color-mix(in srgb, var(--brand-navy) 5%, transparent);
+  --shadow-sm: 0 2px 6px color-mix(in srgb, var(--brand-navy) 6%, transparent);
+  --shadow-md: 0 4px 14px color-mix(in srgb, var(--brand-navy) 8%, transparent);
+  --shadow-lg: 0 10px 28px color-mix(in srgb, var(--brand-navy) 10%, transparent);
+
+  /* =========================================================
+   * 11) Motion
+   * ========================================================= */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* =========================================================
+   * 12) Breakpoints (reference; mobile-first)
+   * ========================================================= */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
+  /* =========================================================
+   * 13) Layout
+   * ========================================================= */
+  --container-max: 72rem;
+  --header-height: 3.5rem;
+  --bottom-nav-height: 4rem;
+
+  /* =========================================================
+   * 14) Motif system (textile + floral — Iraqi/regional–inspired)
+   * ========================================================= */
+  --pattern-opacity-subtle: 0.1;
+  --pattern-opacity-medium: 0.22;
+  --pattern-opacity-strong: 0.78;
+  --pattern-size-sm: 1.15rem;
+  --pattern-size-md: 2.15rem;
+  --pattern-size-lg: 3.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+  }
+}

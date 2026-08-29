@@ -1,0 +1,30 @@
+{
+  "name": "koulshy-taib",
+  "version": "0.1.0",
+  "private": true,
+  "description": "كلشي طيب — monorepo (frontend web + database backend)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @koulshy/web",
+    "build": "npm run generate -w @koulshy/database && npm run build -w @koulshy/web",
+    "start": "npm run start -w @koulshy/web",
+    "lint": "npm run lint -w @koulshy/web",
+    "typecheck": "npm run typecheck -w @koulshy/web",
+    "db:generate": "npm run generate -w @koulshy/database",
+    "db:migrate": "npm run migrate -w @koulshy/database",
+    "db:migrate:deploy": "npm run migrate:deploy -w @koulshy/database",
+    "db:seed": "npm run seed -w @koulshy/database",
+    "db:studio": "npm run studio -w @koulshy/database",
+    "db:reset": "npm run reset -w @koulshy/database",
+    "db:verify": "tsx scripts/verify-runtime-db.ts",
+    "db:local:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-local.ps1 start",
+    "db:local:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-local.ps1 stop",
+    "db:local:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-local.ps1 status"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+  <!-- Subtle floral tile for section atmosphere — navy strokes, low opacity in UI -->
+  <g stroke="#1B2A4A" stroke-width="1.1" fill="none" opacity="0.55">
+    <circle cx="60" cy="60" r="6"/>
+    <path d="M60 28c6 10 6 22 0 32-6-10-6-22 0-32Z"/>
+    <path d="M60 60c10 6 22 6 32 0-10-6-22-6-32 0Z"/>
+    <path d="M60 92c-6-10-6-22 0-32 6 10 6 22 0 32Z"/>
+    <path d="M60 60c-10-6-22-6-32 0 10 6 22 6 32 0Z"/>
+    <path d="M38 38c8 4 14 10 18 18-8-4-14-10-18-18Z"/>
+    <path d="M82 38c-8 4-14 10-18 18 8-4 14-10 18-18Z"/>
+    <path d="M82 82c-8-4-14-10-18-18 8 4 14 10 18 18Z"/>
+    <path d="M38 82c8-4 14-10 18-18-8 4-14 10-18 18Z"/>
+  </g>
+</svg>

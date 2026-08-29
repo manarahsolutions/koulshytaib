@@ -1,0 +1,5 @@
+﻿# Pending brand files (do not invent)
+# logo-ar.svg
+# logo-en.svg
+# pattern-floral.svg
+# pattern-geometric.svg

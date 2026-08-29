@@ -1,0 +1,367 @@
+// Prisma schema — كلشي طيب
+// PostgreSQL + integer IQD money. Guest-first customers; Admin auth (Phase 18).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerStatus {
+  active
+  inactive
+}
+
+enum AdminRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum OrderStatus {
+  received
+  confirmed
+  preparing
+  out_for_delivery
+  delivered
+  cancelled
+}
+
+enum PaymentMethod {
+  cash
+  electronic
+  wallet
+}
+
+enum OfferType {
+  fixed_price
+  percentage
+}
+
+enum OfferSurface {
+  cream
+  navy
+}
+
+enum CategoryAccent {
+  raspberry
+  yellow
+  green
+  navy
+  cream
+}
+
+enum LoyaltyTransactionType {
+  earn
+  redeem
+  adjust
+}
+
+enum LoyaltySourceType {
+  order
+  reward
+  manual
+}
+
+enum CustomerActivityType {
+  order_created
+  order_confirmed
+  order_delivered
+  order_cancelled
+  points_earned
+  points_redeemed
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+}
+
+enum NotificationType {
+  ORDER_RECEIVED
+  ORDER_CONFIRMED
+  ORDER_PREPARING
+  ORDER_OUT_FOR_DELIVERY
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+model Customer {
+  id        String         @id @default(cuid())
+  /// Canonical normalized Iraqi mobile 07XXXXXXXXX — unique, never PK for URLs
+  phone     String         @unique
+  name      String?
+  status    CustomerStatus @default(active)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  orders          Order[]
+  loyaltyAccount  LoyaltyAccount?
+  activities      CustomerActivity[]
+  notifications   Notification[]
+
+  @@index([createdAt])
+}
+
+model Category {
+  id        String         @id @default(cuid())
+  name      String
+  accent    CategoryAccent @default(navy)
+  href      String
+  visible   Boolean        @default(true)
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  products Product[]
+
+  @@index([visible, sortOrder])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  categoryId  String
+  /// Integer IQD
+  price       Int
+  oldPrice    Int?
+  imageSrc    String?
+  imageAlt    String?
+  /// JSON array of ProductBadge or null
+  badgesJson  Json?
+  available   Boolean  @default(true)
+  visible     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category    Category      @relation(fields: [categoryId], references: [id])
+  offerLinks  OfferProduct[]
+  orderItems  OrderItem[]
+
+  @@index([categoryId])
+  @@index([visible, available])
+  @@index([sortOrder])
+}
+
+model Offer {
+  id              String       @id @default(cuid())
+  title           String
+  description     String?
+  type            OfferType
+  discountPercent Int?
+  /// Integer IQD fixed offer price
+  offerPrice      Int?
+  originalPrice   Int?
+  visible         Boolean      @default(true)
+  active          Boolean      @default(true)
+  featured        Boolean      @default(false)
+  badge           String?
+  imageSrc        String?
+  ctaLabel        String       @default("اطلب العرض")
+  surface         OfferSurface @default(cream)
+  expiresLabel    String?
+  sortOrder       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  products OfferProduct[]
+
+  @@index([visible, active])
+  @@index([featured])
+  @@index([sortOrder])
+}
+
+/// Join table — Offer ↔ Product (no embedded product copies)
+model OfferProduct {
+  offerId   String
+  productId String
+
+  offer   Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([offerId, productId])
+  @@index([productId])
+}
+
+model Order {
+  /// Opaque public order id (cuid) — used in URLs; never phone / sequential
+  id String @id @default(cuid())
+
+  customerId String
+  status     OrderStatus @default(received)
+
+  /// Checkout-time customer snapshot (not CRM identity)
+  snapshotName  String
+  snapshotPhone String
+
+  governorate String
+  area        String
+  address     String
+  landmark    String?
+  notes       String?
+
+  paymentMethod PaymentMethod @default(cash)
+
+  /// Integer IQD
+  subtotal    Int
+  deliveryFee Int
+  total       Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer      Customer             @relation(fields: [customerId], references: [id])
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  notifications Notification[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  /// Nullable if product later removed — historical safety
+  productId String?
+  /// Immutable snapshot
+  name      String
+  unitPrice Int
+  quantity  Int
+  lineTotal Int
+  notes     String?
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model LoyaltyAccount {
+  id               String   @id @default(cuid())
+  customerId       String   @unique
+  /// Cached derived balance — transactions are source of truth
+  pointsBalance    Int      @default(0)
+  lifetimeEarned   Int      @default(0)
+  lifetimeRedeemed Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+}
+
+model LoyaltyTransaction {
+  id               String                 @id @default(cuid())
+  loyaltyAccountId String
+  customerId       String
+  type             LoyaltyTransactionType
+  /// Magnitude or signed adjust — see domain docs
+  points           Int
+  reason           String
+  sourceType       LoyaltySourceType?
+  sourceId         String?
+  relatedOrderId   String?
+  createdAt        DateTime               @default(now())
+
+  account LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+  @@index([loyaltyAccountId])
+  @@index([relatedOrderId])
+  /// Idempotency for earn-on-delivered: one earn per order
+  @@unique([type, relatedOrderId])
+}
+
+model CustomerActivity {
+  id         String               @id @default(cuid())
+  customerId String
+  type       CustomerActivityType
+  relatedId  String?
+  note       String?
+  createdAt  DateTime             @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+}
+
+/// App-level config (loyalty master switch, etc.)
+model AppConfig {
+  id    String @id @default("default")
+  /// JSON blob for LoyaltyConfig
+  loyaltyJson Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Internal Admin operators only — never used for customer identity.
+model AdminUser {
+  id           String    @id @default(cuid())
+  /// Unique login identifier (email or username), stored lowercase
+  identifier   String    @unique
+  passwordHash String
+  role         AdminRole @default(STAFF)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+/// Outbound customer communication intents (Phase 20).
+/// Provider adapters send; Mock never contacts real numbers.
+model Notification {
+  id             String                     @id @default(cuid())
+  customerId     String?
+  orderId        String?
+  channel        NotificationChannel
+  type           NotificationType
+  status         NotificationDeliveryStatus @default(PENDING)
+  /// Safe Arabic title for Admin + future providers
+  title          String
+  /// Message body snapshot — must not include raw phone
+  body           String
+  /// Prevents duplicate sends: orderId:type:channel
+  idempotencyKey String                     @unique
+  attempts       Int                        @default(0)
+  /// Safe error summary — never log phones here
+  lastError      String?
+  provider       String                     @default("mock")
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  sentAt         DateTime?
+  failedAt       DateTime?
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  order    Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+}

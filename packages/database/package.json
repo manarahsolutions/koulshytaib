@@ -1,0 +1,28 @@
+{
+  "name": "@koulshy/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "كلشي طيب — Prisma schema, migrations, and seed (backend data layer)",
+  "scripts": {
+    "generate": "node run-prisma.cjs generate",
+    "migrate": "node run-prisma.cjs migrate dev",
+    "migrate:deploy": "node run-prisma.cjs migrate deploy",
+    "seed": "node run-prisma.cjs db seed",
+    "studio": "node run-prisma.cjs studio",
+    "reset": "node run-prisma.cjs migrate reset"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "tsx --tsconfig ../../apps/web/tsconfig.json prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "prisma": "^6.19.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5"
+  }
+}

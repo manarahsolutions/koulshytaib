@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+  <!-- Soft geometric textile tile — navy, intended at low opacity -->
+  <g stroke="#1B2A4A" stroke-width="1" fill="none" opacity="0.5">
+    <rect x="8" y="8" width="80" height="80" rx="2"/>
+    <path d="M48 8v80M8 48h80"/>
+    <path d="M8 8l80 80M88 8L8 88"/>
+    <circle cx="48" cy="48" r="14"/>
+    <rect x="28" y="28" width="40" height="40" transform="rotate(45 48 48)"/>
+  </g>
+</svg>

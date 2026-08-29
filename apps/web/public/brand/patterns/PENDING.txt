@@ -1,0 +1,9 @@
+# Pattern assets (optional future exports)
+#
+# Digital motif grammar lives in:
+#   src/components/brand/decorative-motif.tsx
+#
+# Optional future SVG exports (designed, not random rug scans):
+#   iraqi-geometric.svg
+#   iraqi-floral.svg
+#   iraqi-border.svg
