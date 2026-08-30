@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FoodMediaPlaceholder } from "@/components/product/food-media-placeholder";
+import { ImageSrcField } from "@/components/admin/image-src-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -201,25 +202,12 @@ export function ProductForm({
             />
           </div>
 
-          <div>
-            <label htmlFor={imageId} className="typo-label text-text">
-              صورة المنتج (مسار محلي اختياري)
-            </label>
-            <Input
-              id={imageId}
-              value={values.imageSrc}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, imageSrc: e.target.value }))
-              }
-              placeholder="/images/…"
-              className="mt-1.5"
-              autoComplete="off"
-              dir="ltr"
-            />
-            <p className="mt-1 text-xs text-text-muted">
-              لا يوجد رفع صور حالياً — استخدم مساراً تحت public إن وُجد.
-            </p>
-          </div>
+          <ImageSrcField
+            label="صورة المنتج"
+            inputId={imageId}
+            value={values.imageSrc}
+            onChange={(imageSrc) => setValues((v) => ({ ...v, imageSrc }))}
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
             <Checkbox

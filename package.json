@@ -13,6 +13,7 @@
     "start": "npm run start -w @koulshy/web",
     "lint": "npm run lint -w @koulshy/web",
     "typecheck": "npm run typecheck -w @koulshy/web",
+    "test": "npm run test -w @koulshy/web",
     "db:generate": "npm run generate -w @koulshy/database",
     "db:migrate": "npm run migrate -w @koulshy/database",
     "db:migrate:deploy": "npm run migrate:deploy -w @koulshy/database",

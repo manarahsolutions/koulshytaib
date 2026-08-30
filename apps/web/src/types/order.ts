@@ -32,6 +32,8 @@ export type OrderPricing = {
   subtotal: number;
   deliveryFee: number;
   total: number;
+  couponCode?: string;
+  couponDiscount?: number;
 };
 
 export type OrderLineSnapshot = {

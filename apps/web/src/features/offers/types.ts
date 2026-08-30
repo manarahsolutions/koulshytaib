@@ -1,6 +1,6 @@
 /**
- * Offer domain — Admin + Customer shared promotions (in-memory).
- * Presentation-only for cart/checkout in Phase 15.
+ * Offer domain — Admin + Customer shared promotions.
+ * Active offers apply to matching cart/checkout lines.
  */
 
 export type OfferType = "fixed_price" | "percentage";
@@ -42,7 +42,6 @@ export type Offer = {
   surface?: OfferSurface;
   /**
    * Display-only copy from seed (not a live schedule).
-   * No startsAt/endsAt in this phase.
    */
   expiresLabel?: string;
   sortOrder: number;

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Package } from "lucide-react";
+import { MessageCircle, Package } from "lucide-react";
+import { getCustomerStatusWhatsAppLinkAction } from "@/app/actions/backend";
 import { AdminOrderNotifications } from "@/components/admin/admin-order-notifications";
 import { AdminStatusTimeline } from "@/components/admin/admin-status-timeline";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
-import { Divider } from "@/components/ui/divider";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Price } from "@/components/ui/price";
 import {
@@ -25,6 +26,8 @@ export function AdminOrderDetailClient() {
     typeof params.id === "string" ? params.id : params.id?.[0] ?? "";
   const order = useOrder(orderId);
   const [error, setError] = useState<string | null>(null);
+  const [waBusy, setWaBusy] = useState(false);
+  const [notifRefresh, setNotifRefresh] = useState(0);
 
   if (!order) {
     return (
@@ -43,6 +46,22 @@ export function AdminOrderDetailClient() {
       />
     );
   }
+
+  const openCustomerWhatsApp = async () => {
+    setWaBusy(true);
+    setError(null);
+    try {
+      const result = await getCustomerStatusWhatsAppLinkAction(order.id);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      window.open(result.data.url, "_blank", "noopener,noreferrer");
+      setNotifRefresh((n) => n + 1);
+    } finally {
+      setWaBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -81,6 +100,26 @@ export function AdminOrderDetailClient() {
 
       <OrderStatusActions order={order} onError={setError} />
 
+      <div className="rounded-lg border border-border bg-surface-elevated p-4">
+        <h2 className="text-base font-semibold text-brand-navy">
+          واتساب الزبون
+        </h2>
+        <p className="mt-1 text-sm text-text-muted">
+          يفتح واتساب برسالة جاهزة حسب الحالة الحالية — أكمل الإرسال من جهازك.
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          loading={waBusy}
+          onClick={() => void openCustomerWhatsApp()}
+          className="mt-3 min-h-11 gap-2"
+        >
+          <MessageCircle className="size-4 shrink-0" aria-hidden />
+          افتح واتساب الزبون
+        </Button>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-border bg-surface-elevated p-4">
           <h2 className="text-base font-semibold text-brand-navy">العميل</h2>
@@ -118,34 +157,26 @@ export function AdminOrderDetailClient() {
             {order.items.map((line) => (
               <li
                 key={`${line.productId}-${line.name}`}
-                className="flex flex-wrap items-start justify-between gap-2 border-b border-border-soft pb-2 last:border-0 last:pb-0"
+                className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border-soft pb-2 last:border-0 last:pb-0"
               >
                 <span>
-                  {line.name}
-                  <span className="text-text-muted"> × {line.quantity}</span>
-                  <span className="mt-0.5 block typo-caption text-text-subtle">
-                    {formatPriceIQD(line.unitPrice)} للقطعة
-                  </span>
+                  {line.name}{" "}
+                  <span className="text-text-muted">× {line.quantity}</span>
                 </span>
-                <span className="tabular-nums font-medium">
+                <span className="font-medium">
                   {formatPriceIQD(line.lineTotal)}
                 </span>
               </li>
             ))}
           </ul>
-          <Divider className="my-3" />
-          <dl className="space-y-2 text-sm">
+          <dl className="mt-4 space-y-1 border-t border-border-soft pt-3 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-text-muted">المجموع الفرعي</dt>
-              <dd className="tabular-nums">
-                {formatPriceIQD(order.pricing.subtotal)}
-              </dd>
+              <dd>{formatPriceIQD(order.pricing.subtotal)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-text-muted">التوصيل</dt>
-              <dd className="tabular-nums">
-                {formatPriceIQD(order.pricing.deliveryFee)}
-              </dd>
+              <dd>{formatPriceIQD(order.pricing.deliveryFee)}</dd>
             </div>
             <div className="flex justify-between gap-3 text-base font-bold">
               <dt>الإجمالي</dt>
@@ -200,9 +231,9 @@ export function AdminOrderDetailClient() {
         </section>
 
         <AdminOrderNotifications
-          key={`${order.id}:${order.status}:${order.updatedAt ?? ""}`}
+          key={`${order.id}:${order.status}:${order.updatedAt ?? ""}:${notifRefresh}`}
           orderId={order.id}
-          refreshKey={`${order.status}:${order.updatedAt ?? order.createdAt}`}
+          refreshKey={`${order.status}:${order.updatedAt ?? order.createdAt}:${notifRefresh}`}
         />
       </div>
     </div>

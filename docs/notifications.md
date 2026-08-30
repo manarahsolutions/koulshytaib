@@ -1,85 +1,80 @@
-# Notifications Foundation — كلشي طيب (Phase 20)
+# Notifications — كلشي طيب (Phase 20 + 21 deeplink)
 
-Order communication domain with provider abstraction. **No real WhatsApp/SMS** in this phase.
+Order communication with provider abstraction. **Phase 21 practical path:** WhatsApp **click-to-chat** (`wa.me`) for kitchen + customer — no Meta Business API required.
 
 ## Architecture
 
 ```text
-Order event (checkout / status change)
+Guest checkout success
         ↓
-enqueueAndDispatchOrderStatusNotification()
+  enqueue mock ORDER_RECEIVED (optional auto path)
         ↓
-Notification row (idempotent)
+  Success page CTA → getKitchenOrderWhatsAppLinkAction
         ↓
-NotificationProvider
-        └── MockProvider (default)
+  wa.me/<KITCHEN_E164>?text=order details  (customer taps Send)
+        ↓
+  Notification row provider=whatsapp_deeplink (kitchen)
+
+Admin status / detail
+        ↓
+  getCustomerStatusWhatsAppLinkAction
+        ↓
+  wa.me/<customer E164>?text=status template
+        ↓
+  Notification row provider=whatsapp_deeplink (customer)
 ```
 
-Real providers (WhatsApp Business API, SMS gateway) plug in later without rewriting order flows.
+Automated Cloud API / SMS gateways remain future work.
 
 ## Schema
 
-`Notification`:
+`Notification` unchanged. Deeplink rows use:
 
 | Field | Notes |
 | --- | --- |
-| channel | `WHATSAPP` \| `SMS` |
-| type | `ORDER_RECEIVED` … `ORDER_CANCELLED` |
-| status | `PENDING` → `SENDING` → `SENT` \| `FAILED` |
-| title / body | Arabic snapshot — **no raw phone** |
-| idempotencyKey | `orderId:type:channel` (unique) |
-| attempts | Incremented on each send attempt |
-| provider | `mock` (Phase 20) |
-
-Migration: `prisma/migrations/20260829140000_notifications/`
+| channel | `WHATSAPP` |
+| provider | `whatsapp_deeplink` |
+| idempotencyKey | `orderId:type:WHATSAPP:deeplink_kitchen` or `…:deeplink_customer` |
+| status | Marked `SENT` when the server issues the `wa.me` URL (guest/staff still must press Send in WhatsApp) |
 
 ## Triggers
 
-| Event | Notification type |
+| Event | Path |
 | --- | --- |
-| Guest checkout success | `ORDER_RECEIVED` |
-| Status → confirmed | `ORDER_CONFIRMED` |
-| Status → preparing | `ORDER_PREPARING` |
-| Status → out_for_delivery | `ORDER_OUT_FOR_DELIVERY` |
-| Status → delivered | `ORDER_DELIVERED` |
-| Status → cancelled | `ORDER_CANCELLED` |
+| Guest checkout | Mock auto notify (Phase 20) + **kitchen deeplink** on success CTA |
+| Admin “افتح واتساب الزبون” | Customer deeplink for **current** order status |
+| Status → confirmed…cancelled | Existing mock enqueue (unchanged) |
 
-Notification failures are logged and **do not** roll back order mutations.
+Notification / deeplink failures **do not** roll back order mutations.
 
-## Idempotency
+## Env
 
-Duplicate status updates / retries reuse the same `idempotencyKey`. Already `SENT` or `SENDING` rows are not dispatched again.
-
-## Providers
-
-| Env | Behavior |
+| Var | Role |
 | --- | --- |
-| `NOTIFICATION_PROVIDER=mock` (default) | Log safe metadata; mark SENT; never dial |
-| Other values | Warned + fall back to mock |
-
-Optional: `NOTIFICATION_DEFAULT_CHANNEL=WHATSAPP` \| `SMS`
+| `KITCHEN_WHATSAPP_E164` | Kitchen WhatsApp digits (e.g. `9647XXXXXXXXX`). Omit → hide kitchen CTA |
+| `NOTIFICATION_PROVIDER` | Still `mock` for automatic dispatch |
+| `NOTIFICATION_DEFAULT_CHANNEL` | `WHATSAPP` \| `SMS` (label for auto path) |
 
 ## Admin UI
 
-Order detail → **سجل الإشعارات**: type, channel, status, timestamps, attempts, body snapshot.
+Order detail:
+
+- **واتساب الزبون** — opens prefilled status message
+- **سجل الإشعارات** — shows mock + deeplink rows
 
 ## Privacy
 
-- No phone in URLs or notification bodies
+- Kitchen message includes customer phone (needed for fulfillment via WhatsApp)
+- Customer-facing status templates still avoid embedding the phone in the body text
 - Mock logs omit destination phone
-- `lastError` redacts `07XXXXXXXXX` patterns
-
-## Retry
-
-`retryNotification(id)` resets FAILED/PENDING and re-dispatches. No job queue yet.
 
 ## Limitations
 
-- Mock only — no real customer messages
-- No Admin Notification Center
+- Not server-pushed WhatsApp (no Cloud API)
+- Cannot prove the user pressed Send in WhatsApp
+- No SMS gateway
 - No bulk retry UI
-- No WhatsApp template approval flow
 
-## Next
+## Next (optional)
 
-Phase 21: real WhatsApp provider after vendor selection.
+Meta WhatsApp Cloud API or Twilio for fully automatic delivery without deeplinks.

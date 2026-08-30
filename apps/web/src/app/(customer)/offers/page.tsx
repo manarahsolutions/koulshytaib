@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "العروض",
-  description: "عروض كلشي طيب — للعرض فقط، الخصم ما ينطبق تلقائياً على السلة.",
+  description: "عروض كلشي طيب — الخصم ينطبق على المنتجات المشمولة في السلة تلقائياً.",
 };
 
 /**
@@ -45,7 +45,7 @@ export default function OffersPage() {
           العروض
         </h1>
         <p className="typo-caption mt-1 text-text-muted">
-          العروض للعرض فقط — الخصم ما ينطبق تلقائياً على السلة أو الدفع بعد
+          الخصم ينطبق تلقائياً على المنتجات المشمولة عند إضافتها للسلة
         </p>
 
         <div className="mt-6 flex flex-col gap-4">

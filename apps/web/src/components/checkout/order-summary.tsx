@@ -17,6 +17,8 @@ export type OrderSummaryProps = {
   lines: SummaryLine[];
   subtotal: number;
   deliveryFee?: number;
+  couponDiscount?: number;
+  couponCode?: string;
   className?: string;
   /** Sticky on large screens only */
   sticky?: boolean;
@@ -26,10 +28,13 @@ export function OrderSummary({
   lines,
   subtotal,
   deliveryFee = DELIVERY_FEE_IQD,
+  couponDiscount = 0,
+  couponCode,
   className,
   sticky = false,
 }: OrderSummaryProps) {
-  const total = subtotal + deliveryFee;
+  const safeDiscount = Math.max(0, Math.min(subtotal, couponDiscount));
+  const total = subtotal - safeDiscount + deliveryFee;
 
   return (
     <aside
@@ -87,6 +92,21 @@ export function OrderSummary({
             {formatPriceIQD(subtotal)}
           </dd>
         </div>
+        {safeDiscount > 0 ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">
+              خصم الكوبون
+              {couponCode ? (
+                <span className="ms-1 font-medium text-brand-primary">
+                  ({couponCode})
+                </span>
+              ) : null}
+            </dt>
+            <dd className="tabular-nums text-brand-primary">
+              −{formatPriceIQD(safeDiscount)}
+            </dd>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-3">
           <dt className="text-text-muted">التوصيل</dt>
           <dd className="tabular-nums text-text">

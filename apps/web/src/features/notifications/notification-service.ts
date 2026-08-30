@@ -18,12 +18,18 @@ import {
   buildOrderStatusMessage,
   notificationTypeForOrderStatus,
 } from "@/features/notifications/templates";
+import {
+  WHATSAPP_DEEPLINK_PROVIDER,
+  deeplinkIdempotencyKey,
+} from "@/features/notifications/whatsapp-deeplink";
 import type {
   NotificationChannel,
   NotificationRecord,
+  NotificationType,
 } from "@/features/notifications/types";
-import { prisma } from "@/lib/db/prisma";
+import { isDatabaseConfigured, prisma } from "@/lib/db/prisma";
 import type { OrderStatus } from "@/types/order";
+import { logServerError } from "@/lib/db/errors";
 
 const DEFAULT_CHANNEL: NotificationChannel = "WHATSAPP";
 
@@ -134,3 +140,49 @@ export async function retryNotification(
 }
 
 export { dbListNotificationsForOrder };
+
+/**
+ * Record a manual WhatsApp deeplink handoff (kitchen or customer).
+ * Marks SENT when the server issues the wa.me URL (staff/guest still must tap Send).
+ */
+export async function recordWhatsAppDeeplinkNotification(input: {
+  orderId: string;
+  customerId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  audience: "kitchen" | "customer";
+}): Promise<NotificationRecord | null> {
+  if (!isDatabaseConfigured()) return null;
+
+  const idempotencyKey = deeplinkIdempotencyKey({
+    orderId: input.orderId,
+    type: input.type,
+    audience: input.audience,
+  });
+
+  try {
+    const { record, created } = await dbCreateNotificationIdempotent({
+      customerId: input.customerId,
+      orderId: input.orderId,
+      channel: "WHATSAPP",
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      idempotencyKey,
+      provider: WHATSAPP_DEEPLINK_PROVIDER,
+    });
+
+    if (record.status === "SENT") return record;
+
+    if (created || record.status === "PENDING" || record.status === "FAILED") {
+      const sending = await dbMarkNotificationSending(record.id);
+      return dbMarkNotificationSent(sending.id);
+    }
+
+    return record;
+  } catch (error) {
+    logServerError("recordWhatsAppDeeplinkNotification", error);
+    return null;
+  }
+}

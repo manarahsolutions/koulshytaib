@@ -5,6 +5,11 @@
  * Replace with backend / admin configuration later.
  */
 
+export {
+  calcCheckoutTotalsWithCoupon,
+  calcCouponDiscount,
+} from "@/features/checkout/coupon-math";
+
 /** Mock delivery fee in IQD — change freely until backend owns pricing. */
 export const DELIVERY_FEE_IQD = 3000;
 

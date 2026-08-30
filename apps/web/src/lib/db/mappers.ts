@@ -144,6 +144,8 @@ export function mapOrder(
       subtotal: row.subtotal,
       deliveryFee: row.deliveryFee,
       total: row.total,
+      couponCode: row.couponCode ?? undefined,
+      couponDiscount: row.couponDiscount > 0 ? row.couponDiscount : undefined,
     },
     status: row.status as OrderStatus,
     statusHistory: row.statusHistory

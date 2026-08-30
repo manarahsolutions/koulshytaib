@@ -21,6 +21,11 @@ import {
   type LoyaltyTransactionSource,
   type LoyaltyTransactionType,
 } from "@/features/loyalty/types";
+import {
+  calculateEarnedPoints,
+  isOrderEligibleForEarning,
+} from "@/features/loyalty/loyalty-rules";
+import type { Order } from "@/types/order";
 
 export async function dbGetLoyaltyConfig(): Promise<LoyaltyConfig> {
   const row = await prisma.appConfig.findUnique({ where: { id: "default" } });
@@ -189,4 +194,37 @@ export async function dbUpsertLoyaltyConfig(
       loyaltyJson: config as unknown as Prisma.InputJsonValue,
     },
   });
+}
+
+/**
+ * Award earn points for a delivered order (idempotent via relatedOrderId + type earn).
+ */
+export async function dbAwardPointsForDeliveredOrder(
+  order: Order,
+): Promise<"awarded" | "skipped" | "already_awarded"> {
+  const config = await dbGetLoyaltyConfig();
+  if (!config.enabled || !config.earning.enabled) return "skipped";
+  if (!isOrderEligibleForEarning(order) || !order.customerId) return "skipped";
+
+  const existing = await prisma.loyaltyTransaction.findFirst({
+    where: {
+      customerId: order.customerId,
+      type: "earn",
+      relatedOrderId: order.id,
+    },
+  });
+  if (existing) return "already_awarded";
+
+  const points = calculateEarnedPoints(order, config);
+  if (points <= 0) return "skipped";
+
+  await dbAppendLoyaltyTransaction({
+    customerId: order.customerId,
+    type: "earn",
+    points,
+    reason: "order_delivered",
+    source: { type: "order", id: order.id },
+    relatedOrderId: order.id,
+  });
+  return "awarded";
 }

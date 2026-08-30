@@ -7,6 +7,7 @@ import {
   LoyaltyCustomerCards,
   LoyaltyCustomerTable,
 } from "@/components/admin/loyalty-customer-list";
+import { LoyaltyEnableToggle } from "@/components/admin/loyalty-enable-toggle";
 import { StatCard } from "@/components/admin/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getLoyaltyConfig } from "@/features/loyalty/loyalty-service";
@@ -20,10 +21,12 @@ import { useCustomers } from "@/features/customers/use-crm-customers";
 
 export function AdminLoyaltyClient() {
   const [query, setQuery] = useState("");
+  const [uiTick, setUiTick] = useState(0);
   const revision = useLoyaltyRevision();
   const customers = useCustomers();
   const items = useLoyaltyCustomerList(query);
   void revision;
+  void uiTick;
   const config = getLoyaltyConfig();
   const overview = getLoyaltyOverviewMetrics();
 
@@ -56,6 +59,10 @@ export function AdminLoyaltyClient() {
           >
             {config.enabled ? "مفعّل" : "غير مفعّل"}
           </span>
+          <LoyaltyEnableToggle
+            enabled={config.enabled}
+            onChanged={() => setUiTick((t) => t + 1)}
+          />
         </div>
         {!config.enabled ? (
           <p className="mt-2 text-sm text-text-muted" role="status">

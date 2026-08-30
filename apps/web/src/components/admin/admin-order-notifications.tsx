@@ -46,7 +46,7 @@ export function AdminOrderNotifications({
         سجل الإشعارات
       </h2>
       <p className="mt-1 text-xs text-text-muted">
-        نيات الإرسال للزبون — حالياً عبر مزود تجريبي (بدون رسائل حقيقية)
+        سجل الإرسال: mock تلقائي + روابط واتساب يدوية (deeplink) للمطبخ/الزبون
       </p>
 
       {error ? (

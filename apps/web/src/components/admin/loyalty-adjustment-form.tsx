@@ -1,16 +1,21 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
+import {
+  adjustLoyaltyPointsAction,
+  fetchCrmBootstrapAction,
+} from "@/app/actions/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  adjustPoints,
   getLoyaltyConfig,
+  setLoyaltyConfig,
 } from "@/features/loyalty/loyalty-service";
 import { mapLoyaltyErrorMessage } from "@/features/loyalty/selectors";
-import { LoyaltyError } from "@/features/loyalty/types";
 import { fieldDescribedBy } from "@/components/checkout/field";
+import { replaceLoyaltyFromServer } from "@/features/loyalty/loyalty-repository";
+import { replaceCustomersFromServer } from "@/features/customers/customer-repository";
 
 export type LoyaltyAdjustmentFormProps = {
   customerId: string;
@@ -37,7 +42,7 @@ export function LoyaltyAdjustmentForm({
     reason?: string;
   }>({});
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSuccess(false);
     setError(null);
@@ -60,17 +65,30 @@ export function LoyaltyAdjustmentForm({
 
     setBusy(true);
     try {
-      adjustPoints(customerId, parsed, reason.trim());
+      const result = await adjustLoyaltyPointsAction(
+        customerId,
+        parsed,
+        reason.trim(),
+      );
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      const crm = await fetchCrmBootstrapAction();
+      if (crm.ok) {
+        replaceCustomersFromServer(crm.data.customers);
+        replaceLoyaltyFromServer({
+          accounts: crm.data.accounts,
+          transactions: crm.data.transactions,
+        });
+        setLoyaltyConfig(crm.data.config);
+      }
       setAmount("");
       setReason("");
       setSuccess(true);
       onSuccess();
-    } catch (err) {
-      if (err instanceof LoyaltyError) {
-        setError(mapLoyaltyErrorMessage(err.code));
-      } else {
-        setError(mapLoyaltyErrorMessage("UNKNOWN"));
-      }
+    } catch {
+      setError(mapLoyaltyErrorMessage("UNKNOWN"));
     } finally {
       setBusy(false);
     }
@@ -79,7 +97,7 @@ export function LoyaltyAdjustmentForm({
   return (
     <form
       className="space-y-4 rounded-lg border border-border bg-surface-elevated p-4"
-      onSubmit={onSubmit}
+      onSubmit={(e) => void onSubmit(e)}
       noValidate
     >
       <div>

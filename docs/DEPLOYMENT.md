@@ -79,7 +79,10 @@ Project → **Settings → Environment Variables** — أضف للبيئات Pro
 | `ADMIN_SESSION_SECRET` | قيمة عشوائية قوية (مثلاً 32+ حرف) |
 | `ADMIN_SEED_IDENTIFIER` | اختياري — لإنشاء أدمن عند الـ seed فقط |
 | `ADMIN_SEED_PASSWORD` | اختياري — لا تتركه بعد أول نشر إن استخدمت seed |
-| `NOTIFICATION_PROVIDER` | `mock` (الوضع الحالي) |
+| `NOTIFICATION_PROVIDER` | `mock` (الإرسال الآلي؛ deeplink منفصل) |
+| `NOTIFICATION_DEFAULT_CHANNEL` | `WHATSAPP` أو `SMS` (تسمية القناة) |
+| `KITCHEN_WHATSAPP_E164` | رقم مطبخ واتساب بدون `+` (مثال `9647XXXXXXXXX`) — لتثبيت الطلب عبر wa.me |
+| `BLOB_READ_WRITE_TOKEN` | اختياري — رفع صور الأدمن عبر Vercel Blob في الإنتاج |
 
 ثم **Redeploy**.
 

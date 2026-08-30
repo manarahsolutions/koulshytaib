@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { FoodMediaPlaceholder } from "@/components/product/food-media-placeholder";
+import { ImageSrcField } from "@/components/admin/image-src-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -432,21 +433,12 @@ export function OfferForm({
             </div>
           </div>
 
-          <div>
-            <label htmlFor={`${formId}-image`} className="typo-label text-text">
-              صورة العرض (مسار محلي اختياري)
-            </label>
-            <Input
-              id={`${formId}-image`}
-              value={values.imageSrc}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, imageSrc: e.target.value }))
-              }
-              placeholder="/images/…"
-              className="mt-1.5"
-              dir="ltr"
-            />
-          </div>
+          <ImageSrcField
+            label="صورة العرض"
+            inputId={`${formId}-image`}
+            value={values.imageSrc}
+            onChange={(imageSrc) => setValues((v) => ({ ...v, imageSrc }))}
+          />
 
           <div>
             <label

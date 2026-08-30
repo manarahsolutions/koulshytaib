@@ -1,7 +1,9 @@
 "use client";
 
-import { CheckCircle2, Package } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, MessageCircle, Package } from "lucide-react";
 import Link from "next/link";
+import { getKitchenOrderWhatsAppLinkAction } from "@/app/actions/backend";
 import { DecorativeMotif } from "@/components/brand/decorative-motif";
 import { OrderStatusTimeline } from "@/components/orders/order-status-timeline";
 import { OrderSummaryCard } from "@/components/orders/order-summary-card";
@@ -14,6 +16,30 @@ import { cn } from "@/lib/utils/cn";
 
 export function OrderSuccessClient() {
   const order = useActiveOrder();
+  const [kitchenUrl, setKitchenUrl] = useState<string | null | undefined>(
+    undefined,
+  );
+  const [kitchenError, setKitchenError] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    let cancelled = false;
+    void (async () => {
+      const result = await getKitchenOrderWhatsAppLinkAction(order);
+      if (cancelled) return;
+      if (!result.ok) {
+        setKitchenError(result.message);
+        setKitchenUrl(null);
+        return;
+      }
+      setKitchenError(null);
+      setKitchenUrl(result.data.url);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order]);
 
   if (!order) {
     return (
@@ -41,6 +67,13 @@ export function OrderSuccessClient() {
 
   const statusLabel = getOrderStatusLabel(order.status);
 
+  const openKitchenWhatsApp = () => {
+    if (!kitchenUrl) return;
+    setOpening(true);
+    window.open(kitchenUrl, "_blank", "noopener,noreferrer");
+    setOpening(false);
+  };
+
   return (
     <PageContainer width="narrow" className="py-10">
       <DecorativeMotif
@@ -58,20 +91,61 @@ export function OrderSuccessClient() {
         />
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-brand-navy">
-            تم تجهيز طلبك
+            تم استلام طلبك
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-text-muted">
             شكراً لاختيارك كلشي طيب
             {order.customer.name ? `، ${order.customer.name}` : ""}.
           </p>
           <p className="mt-1 text-sm text-text-muted">
-            طلبك جاهز للمتابعة.
-          </p>
-          <p className="typo-caption mt-3 text-text-subtle">
-            هذي معاينة واجهة فقط — الطلب ما انحفظ بعد على سيرفر المطعم.
+            ثبّت الطلب على واتساب المطبخ حتى يوصلهم فوراً.
           </p>
         </div>
       </div>
+
+      {kitchenUrl ? (
+        <section
+          className="mt-8 rounded-3xl border border-brand-green/25 bg-success-subtle/40 p-4 sm:p-5"
+          aria-labelledby="kitchen-wa-heading"
+        >
+          <h2
+            id="kitchen-wa-heading"
+            className="text-lg font-bold text-brand-navy"
+          >
+            تثبيت الطلب على واتساب
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-text-muted">
+            اضغط الزر، تأكد من الرسالة، ثم اضغط إرسال في واتساب حتى يستلم المطبخ
+            تفاصيل طلبك.
+          </p>
+          <button
+            type="button"
+            onClick={openKitchenWhatsApp}
+            disabled={opening}
+            className={cn(
+              "mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-green px-5 text-sm font-semibold text-on-green",
+              "hover:opacity-95",
+              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+              "disabled:opacity-60",
+            )}
+          >
+            <MessageCircle
+              className="size-5 shrink-0"
+              strokeWidth={ICON_STROKE.emphasis}
+              aria-hidden
+            />
+            ثبّت الطلب على واتساب
+          </button>
+        </section>
+      ) : kitchenUrl === null ? (
+        <p className="mt-6 rounded-2xl border border-border-soft bg-surface-warm px-4 py-3 text-sm text-text-muted">
+          {kitchenError
+            ? kitchenError
+            : "تواصل مع المطعم عبر الهاتف إذا احتجت تأكيد إضافي — رقم واتساب المطبخ غير مُعدّ حالياً."}
+        </p>
+      ) : (
+        <p className="mt-6 text-sm text-text-muted">جارٍ تجهيز رابط واتساب…</p>
+      )}
 
       <section
         className="relative mt-8 rounded-3xl border border-border-soft bg-surface-elevated p-4 shadow-xs sm:p-5"

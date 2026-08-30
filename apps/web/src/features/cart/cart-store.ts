@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  applyOffersToLines,
+  sumPricedLines,
+} from "@/features/offers/apply-offers";
+import { listOffers } from "@/features/offers/offer-repository";
 import { getProductById } from "@/features/products/product-repository";
 import { isProductAvailable } from "@/features/products/selectors";
 
@@ -138,11 +143,37 @@ export function selectCartUnitCount(state: CartState): number {
 }
 
 export function selectCartSubtotal(state: CartState): number {
-  return state.items.reduce((sum, item) => {
-    const product = getProductById(item.productId);
-    if (!product) return sum;
-    return sum + product.price * item.quantity;
-  }, 0);
+  const lines = state.items
+    .map((item) => {
+      const product = getProductById(item.productId);
+      if (!product) return null;
+      return {
+        productId: item.productId,
+        catalogUnitPrice: product.price,
+        quantity: item.quantity,
+      };
+    })
+    .filter((l): l is NonNullable<typeof l> => l != null);
+
+  return sumPricedLines(applyOffersToLines(lines, listOffers()));
+}
+
+/** Per-line pricing including best active offer (for UI). */
+export function selectCartPricedLines(state: CartState) {
+  const lines = state.items
+    .map((item) => {
+      const product = getProductById(item.productId);
+      if (!product) return null;
+      return {
+        productId: item.productId,
+        catalogUnitPrice: product.price,
+        quantity: item.quantity,
+        name: product.name,
+      };
+    })
+    .filter((l): l is NonNullable<typeof l> => l != null);
+
+  return applyOffersToLines(lines, listOffers());
 }
 
 export function selectCartItemQuantity(

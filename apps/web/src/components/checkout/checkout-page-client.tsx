@@ -33,12 +33,13 @@ import {
   sanitizePhoneInput,
 } from "@/lib/format/phone";
 import {
-  calcCheckoutTotals,
+  calcCheckoutTotalsWithCoupon,
   DELIVERY_FEE_IQD,
 } from "@/features/checkout/pricing";
 import {
   databaseStatusAction,
   placeGuestOrderAction,
+  validateCouponAction,
 } from "@/app/actions/backend";
 import {
   placeGuestOrder,
@@ -132,6 +133,13 @@ export function CheckoutPageClient() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [touchedSubmit, setTouchedSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+  } | null>(null);
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -157,7 +165,43 @@ export function CheckoutPageClient() {
     });
   }, [items]);
 
-  const totals = calcCheckoutTotals(subtotal, DELIVERY_FEE_IQD);
+  const totals = calcCheckoutTotalsWithCoupon({
+    subtotal,
+    deliveryFee: DELIVERY_FEE_IQD,
+    couponDiscount: appliedCoupon?.discount ?? 0,
+  });
+
+  const applyCoupon = useCallback(async () => {
+    const code = couponInput.trim();
+    if (!code) {
+      setCouponMessage("اكتب كود الخصم");
+      return;
+    }
+    setCouponLoading(true);
+    setCouponMessage(null);
+    try {
+      const result = await validateCouponAction(code, subtotal);
+      if (!result.ok) {
+        setAppliedCoupon(null);
+        setCouponMessage(result.message);
+        return;
+      }
+      setAppliedCoupon({
+        code: result.data.code,
+        discount: result.data.discount,
+      });
+      setCouponInput(result.data.code);
+      setCouponMessage(`تم تطبيق الخصم: ${result.data.code}`);
+    } finally {
+      setCouponLoading(false);
+    }
+  }, [couponInput, subtotal]);
+
+  const clearCoupon = useCallback(() => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponMessage(null);
+  }, []);
 
   const setField = useCallback(
     <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
@@ -241,6 +285,7 @@ export function CheckoutPageClient() {
           delivery: checkout.delivery,
           paymentMethod: checkout.paymentMethod,
           items: cartLines,
+          couponCode: appliedCoupon?.code,
         });
         if (!result.ok) {
           setErrors({ form: result.message });
@@ -254,7 +299,13 @@ export function CheckoutPageClient() {
           delivery: checkout.delivery,
           paymentMethod: checkout.paymentMethod,
           items: lines,
-          pricing: totals,
+          pricing: {
+            subtotal: totals.subtotal,
+            deliveryFee: totals.deliveryFee,
+            total: totals.total,
+            couponCode: appliedCoupon?.code,
+            couponDiscount: totals.couponDiscount || undefined,
+          },
         });
       }
 
@@ -487,6 +538,53 @@ export function CheckoutPageClient() {
               </Field>
             </FormSection>
 
+            <FormSection title="كود الخصم">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <Input
+                  id={`${formId}-coupon`}
+                  name="coupon"
+                  autoComplete="off"
+                  placeholder="مثلاً: TAIB10"
+                  dir="ltr"
+                  className="text-start sm:flex-1"
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  disabled={Boolean(appliedCoupon)}
+                />
+                {appliedCoupon ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={clearCoupon}
+                    className="shrink-0"
+                  >
+                    إزالة
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={couponLoading}
+                    onClick={() => void applyCoupon()}
+                    className="shrink-0"
+                  >
+                    تطبيق
+                  </Button>
+                )}
+              </div>
+              {couponMessage ? (
+                <p
+                  className={cn(
+                    "typo-caption",
+                    appliedCoupon ? "text-brand-primary" : "text-danger",
+                  )}
+                  role="status"
+                >
+                  {couponMessage}
+                </p>
+              ) : null}
+            </FormSection>
+
             <FormSection title="طريقة الدفع">
               <Radio
                 ref={paymentRef}
@@ -511,6 +609,8 @@ export function CheckoutPageClient() {
                 lines={lines}
                 subtotal={totals.subtotal}
                 deliveryFee={totals.deliveryFee}
+                couponDiscount={totals.couponDiscount}
+                couponCode={appliedCoupon?.code}
               />
             </div>
 
@@ -548,6 +648,8 @@ export function CheckoutPageClient() {
               lines={lines}
               subtotal={totals.subtotal}
               deliveryFee={totals.deliveryFee}
+              couponDiscount={totals.couponDiscount}
+              couponCode={appliedCoupon?.code}
               sticky
             />
           </div>

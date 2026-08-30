@@ -43,11 +43,33 @@ import {
   dbListAllLoyaltyTransactions,
   dbListLoyaltyAccounts,
   dbListLoyaltyTransactions,
+  dbAppendLoyaltyTransaction,
+  dbUpsertLoyaltyConfig,
+  dbAwardPointsForDeliveredOrder,
 } from "@/features/loyalty/db-loyalty-repository";
+import {
+  dbCreateCoupon,
+  dbListCoupons,
+  dbSetCouponActive,
+  dbValidateCouponForSubtotal,
+} from "@/features/coupons/db-coupon-repository";
+import { dbGetAnalyticsSnapshot } from "@/features/analytics/db-analytics";
+import { setLoyaltyConfig } from "@/features/loyalty/loyalty-service";
+import type { LoyaltyConfig } from "@/features/loyalty/types";
+
 import {
   dbListNotificationsForOrder,
   enqueueAndDispatchOrderStatusNotification,
+  recordWhatsAppDeeplinkNotification,
 } from "@/features/notifications/notification-service";
+import {
+  buildCustomerStatusWhatsAppText,
+  buildKitchenOrderMessage,
+  buildWaMeUrl,
+  getKitchenWhatsAppE164FromEnv,
+  iraqiLocalToE164,
+} from "@/features/notifications/whatsapp-deeplink";
+import { formatOrderRefForMessage } from "@/features/notifications/templates";
 import { DELIVERY_FEE_IQD } from "@/features/checkout/pricing";
 import { requireAdmin } from "@/features/admin-auth/authorization";
 import { AuthError } from "@/features/admin-auth/types";
@@ -306,6 +328,7 @@ export type PlaceOrderActionInput = {
   paymentMethod: PaymentMethodId;
   /** Client cart lines — prices/names ignored; validated against DB */
   items: Array<{ productId: string; quantity: number; notes?: string }>;
+  couponCode?: string;
 };
 
 /**
@@ -325,6 +348,7 @@ export async function placeGuestOrderAction(
       paymentMethod: input.paymentMethod,
       items: input.items,
       deliveryFee: DELIVERY_FEE_IQD,
+      couponCode: input.couponCode?.trim() || undefined,
     });
 
     // Notification failure must not roll back a successful order
@@ -386,6 +410,11 @@ export async function updateOrderStatusAction(
         type: "order_delivered",
         relatedId: data.id,
       });
+      try {
+        await dbAwardPointsForDeliveredOrder(data);
+      } catch (loyaltyError) {
+        logServerError("updateOrderStatus.loyalty", loyaltyError);
+      }
     } else if (nextStatus === "cancelled") {
       await dbRecordActivity({
         customerId: data.customerId,
@@ -430,6 +459,91 @@ export async function fetchOrderNotificationsAction(
     return { ok: true, data };
   } catch (error) {
     return fail(error, "fetchOrderNotifications");
+  }
+}
+
+/**
+ * Guest success page: wa.me link so the customer sends the order to the kitchen.
+ * Does not require DB for URL generation; records a deeplink notification when DB is up.
+ */
+export async function getKitchenOrderWhatsAppLinkAction(
+  order: Order,
+): Promise<ActionResult<{ url: string | null }>> {
+  try {
+    const kitchenE164 = getKitchenWhatsAppE164FromEnv();
+    if (!kitchenE164) {
+      return { ok: true, data: { url: null } };
+    }
+
+    const text = buildKitchenOrderMessage(order);
+    const url = buildWaMeUrl(kitchenE164, text);
+
+    if (isDatabaseConfigured() && order.customerId) {
+      try {
+        await recordWhatsAppDeeplinkNotification({
+          orderId: order.id,
+          customerId: order.customerId,
+          type: "ORDER_RECEIVED",
+          title: "تثبيت الطلب على واتساب المطبخ",
+          body: `رابط wa.me للمطبخ — ${formatOrderRefForMessage(order.id)}. الإرسال يتم من جهاز الزبون.`,
+          audience: "kitchen",
+        });
+      } catch (notifyError) {
+        logServerError("kitchenWhatsAppDeeplink.notify", notifyError);
+      }
+    }
+
+    return { ok: true, data: { url } };
+  } catch (error) {
+    return fail(error, "getKitchenOrderWhatsAppLink");
+  }
+}
+
+/**
+ * Admin: wa.me to customer with current status template (manual send).
+ */
+export async function getCustomerStatusWhatsAppLinkAction(
+  orderId: string,
+): Promise<ActionResult<{ url: string }>> {
+  try {
+    await requireAdminDb();
+    const order = await dbGetOrderById(orderId);
+    if (!order) {
+      return { ok: false, message: "ما لكينا هذا الطلب" };
+    }
+
+    const e164 = iraqiLocalToE164(order.customer.phone);
+    if (!e164) {
+      return { ok: false, message: "رقم هاتف الزبون غير صالح لواتساب" };
+    }
+
+    const crafted = buildCustomerStatusWhatsAppText({
+      orderId: order.id,
+      status: order.status,
+      customerName: order.customer.name,
+    });
+    if (!crafted) {
+      return { ok: false, message: "ماكو رسالة جاهزة لهذي الحالة" };
+    }
+
+    const url = buildWaMeUrl(e164, crafted.text);
+
+    try {
+      await recordWhatsAppDeeplinkNotification({
+        orderId: order.id,
+        customerId: order.customerId,
+        type: crafted.type,
+        title: crafted.title,
+        body: `${crafted.body} (deeplink — أرسل من واتساب الأدمن)`,
+        audience: "customer",
+      });
+    } catch (notifyError) {
+      logServerError("customerWhatsAppDeeplink.notify", notifyError);
+    }
+
+    return { ok: true, data: { url } };
+  } catch (error) {
+    return fail(error, "getCustomerStatusWhatsAppLink");
   }
 }
 
@@ -498,6 +612,115 @@ export async function updateCustomerAction(
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "updateCustomer");
+  }
+}
+
+export async function adjustLoyaltyPointsAction(
+  customerId: string,
+  points: number,
+  reason: string,
+) {
+  try {
+    await requireAdminDb();
+    const config = await dbGetLoyaltyConfig();
+    if (!config.enabled) {
+      return { ok: false as const, message: "نظام الولاء غير مفعّل حالياً" };
+    }
+    if (!Number.isInteger(points) || points === 0) {
+      return { ok: false as const, message: "اكتب عدداً صحيحاً غير صفر" };
+    }
+    if (!reason.trim()) {
+      return { ok: false as const, message: "اكتب سبب التعديل" };
+    }
+    const data = await dbAppendLoyaltyTransaction({
+      customerId,
+      type: "adjust",
+      points,
+      reason: reason.trim(),
+      source: { type: "manual" },
+    });
+    revalidatePath("/admin/loyalty");
+    revalidatePath(`/admin/loyalty/customers/${customerId}`);
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "adjustLoyaltyPoints");
+  }
+}
+
+export async function setLoyaltyConfigAction(
+  patch: Partial<LoyaltyConfig>,
+): Promise<ActionResult<LoyaltyConfig>> {
+  try {
+    await requireAdminDb();
+    const current = await dbGetLoyaltyConfig();
+    const next: LoyaltyConfig = {
+      ...current,
+      ...patch,
+      earning: { ...current.earning, ...patch.earning },
+      redemption: { ...current.redemption, ...patch.redemption },
+    };
+    await dbUpsertLoyaltyConfig(next);
+    setLoyaltyConfig(next);
+    revalidatePath("/admin/loyalty");
+    return { ok: true, data: next };
+  } catch (error) {
+    return fail(error, "setLoyaltyConfig");
+  }
+}
+
+export async function listCouponsAction() {
+  try {
+    await requireAdminDb();
+    return { ok: true as const, data: await dbListCoupons() };
+  } catch (error) {
+    return fail(error, "listCoupons");
+  }
+}
+
+export async function createCouponAction(input: {
+  code: string;
+  type: "percent" | "fixed_iqd";
+  value: number;
+  maxRedemptions?: number;
+  expiresAt?: string;
+}) {
+  try {
+    await requireAdminDb();
+    const data = await dbCreateCoupon(input);
+    revalidatePath("/admin/coupons");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "createCoupon");
+  }
+}
+
+export async function setCouponActiveAction(id: string, active: boolean) {
+  try {
+    await requireAdminDb();
+    const data = await dbSetCouponActive(id, active);
+    revalidatePath("/admin/coupons");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "setCouponActive");
+  }
+}
+
+export async function validateCouponAction(code: string, subtotal: number) {
+  try {
+    requireDb();
+    const data = await dbValidateCouponForSubtotal(code, subtotal);
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "validateCoupon");
+  }
+}
+
+export async function fetchAnalyticsAction() {
+  try {
+    await requireAdminDb();
+    return { ok: true as const, data: await dbGetAnalyticsSnapshot() };
+  } catch (error) {
+    return fail(error, "fetchAnalytics");
   }
 }
 
