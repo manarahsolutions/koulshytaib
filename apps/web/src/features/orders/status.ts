@@ -20,11 +20,11 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 /** Short supporting copy for timeline rows. */
 export const ORDER_STATUS_DESCRIPTIONS: Record<OrderStatus, string> = {
-  received: "تم استلام الطلب",
-  confirmed: "تم تأكيد الطلب",
+  received: "طلبك وصلنا ونراجعه",
+  confirmed: "المطعم أكد طلبك",
   preparing: "المطبخ يجهّز طلبك",
-  out_for_delivery: "الطلب في الطريق",
-  delivered: "وصل الطلب",
+  out_for_delivery: "الطلب في الطريق إليك",
+  delivered: "وصل الطلب — بالعافية",
   cancelled: "تم إلغاء هذا الطلب",
 };
 

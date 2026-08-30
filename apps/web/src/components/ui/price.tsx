@@ -8,6 +8,11 @@ export type PriceProps = HTMLAttributes<HTMLSpanElement> & {
   compareAtAmount?: number;
   currencySuffix?: string;
   size?: "sm" | "md" | "lg";
+  /**
+   * When discounted, stack sale + compare prices vertically (better for narrow cards).
+   * Default: side-by-side wrap.
+   */
+  stack?: boolean;
 };
 
 const sizeClass = {
@@ -21,6 +26,7 @@ export function Price({
   compareAtAmount,
   currencySuffix = "د.ع",
   size = "md",
+  stack = false,
   className,
   ...props
 }: PriceProps) {
@@ -30,7 +36,10 @@ export function Price({
   return (
     <span
       className={cn(
-        "inline-flex flex-wrap items-baseline gap-2 tabular-nums",
+        "inline-flex tabular-nums",
+        stack && isDiscounted
+          ? "flex-col items-start gap-0.5"
+          : "flex-wrap items-baseline gap-x-2 gap-y-0.5",
         className,
       )}
       {...props}
@@ -38,7 +47,7 @@ export function Price({
       <span
         className={cn(
           sizeClass[size],
-          "text-text",
+          "whitespace-nowrap text-text",
           isDiscounted && "text-brand-primary",
         )}
       >
@@ -46,7 +55,7 @@ export function Price({
         {formatPriceIQD(amount, { currencySuffix })}
       </span>
       {isDiscounted ? (
-        <span className="text-sm text-text-subtle line-through">
+        <span className="whitespace-nowrap text-xs text-text-subtle line-through">
           <span className="sr-only">السعر السابق: </span>
           {formatPriceIQD(compareAtAmount, { currencySuffix })}
         </span>

@@ -33,6 +33,34 @@ export async function dbGetOrderById(id: string): Promise<Order | null> {
   return row ? mapOrder(row) : null;
 }
 
+/**
+ * Guest track: latest order for a phone (any status), most recent first.
+ */
+export async function dbGetLatestOrderByPhone(
+  phoneNormalized: string,
+): Promise<Order | null> {
+  const row = await prisma.order.findFirst({
+    where: { snapshotPhone: phoneNormalized },
+    include: orderInclude,
+    orderBy: { createdAt: "desc" },
+  });
+  return row ? mapOrder(row) : null;
+}
+
+/**
+ * Guest track by id — only when phone matches the order snapshot.
+ */
+export async function dbGetOrderForGuestTrack(
+  orderId: string,
+  phoneNormalized: string,
+): Promise<Order | null> {
+  const row = await prisma.order.findFirst({
+    where: { id: orderId, snapshotPhone: phoneNormalized },
+    include: orderInclude,
+  });
+  return row ? mapOrder(row) : null;
+}
+
 export async function dbListOrdersByCustomerId(
   customerId: string,
 ): Promise<Order[]> {

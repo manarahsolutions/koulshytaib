@@ -32,6 +32,8 @@ import {
 } from "@/features/customers/db-customer-repository";
 import {
   dbGetOrderById,
+  dbGetOrderForGuestTrack,
+  dbGetLatestOrderByPhone,
   dbListOrders,
   dbListOrdersByCustomerId,
   dbUpdateOrderStatus,
@@ -75,6 +77,7 @@ import { requireAdmin } from "@/features/admin-auth/authorization";
 import { AuthError } from "@/features/admin-auth/types";
 import { BackendError, logServerError, toUserMessage } from "@/lib/db/errors";
 import { isDatabaseConfigured } from "@/lib/db/prisma";
+import { normalizeIraqiPhone } from "@/lib/format/phone";
 import type {
   CreateCategoryInput,
   CreateProductInput,
@@ -393,6 +396,34 @@ export async function fetchOrderAction(id: string) {
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "fetchOrder");
+  }
+}
+
+/**
+ * Guest order tracking — requires matching phone on the order snapshot.
+ * Pass only `phone` to load the latest order for that number.
+ */
+export async function trackGuestOrderAction(input: {
+  phone: string;
+  orderId?: string;
+}): Promise<ActionResult<Order>> {
+  try {
+    requireDb();
+    const phone = normalizeIraqiPhone(input.phone);
+    if (!phone) {
+      return { ok: false, message: "تأكد من رقم الهاتف" };
+    }
+
+    const data = input.orderId?.trim()
+      ? await dbGetOrderForGuestTrack(input.orderId.trim(), phone)
+      : await dbGetLatestOrderByPhone(phone);
+
+    if (!data) {
+      return { ok: false, message: "ما لكينا طلب مرتبط بهذا الرقم" };
+    }
+    return { ok: true, data };
+  } catch (error) {
+    return fail(error, "trackGuestOrder");
   }
 }
 

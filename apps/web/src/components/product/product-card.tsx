@@ -100,14 +100,16 @@ export function ProductCard({
           <p className="line-clamp-2 text-xs leading-relaxed text-text-muted">
             {product.description}
           </p>
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="mt-1 flex items-end justify-between gap-3">
             <Price
               amount={product.price}
               compareAtAmount={product.oldPrice}
               size="sm"
+              stack
+              className="min-w-0"
             />
             {!available ? (
-              <span className="text-xs font-medium text-text-subtle">
+              <span className="shrink-0 text-xs font-medium text-text-subtle">
                 غير متوفر
               </span>
             ) : quantity > 0 ? (
@@ -115,9 +117,9 @@ export function ProductCard({
                 value={quantity}
                 min={0}
                 max={99}
+                size="sm"
                 aria-label={`كمية ${product.name}`}
                 onChange={(next) => setQuantity(product.id, next)}
-                className="h-10"
               />
             ) : (
               <button
@@ -221,15 +223,17 @@ export function ProductCard({
           ) : null}
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
           <Price
             amount={product.price}
             compareAtAmount={product.oldPrice}
             size="sm"
+            stack
+            className="min-w-0"
           />
 
           {!available ? (
-            <span className="text-xs font-medium text-text-subtle">
+            <span className="shrink-0 text-xs font-medium text-text-subtle">
               غير متوفر
             </span>
           ) : quantity > 0 ? (
@@ -237,9 +241,9 @@ export function ProductCard({
               value={quantity}
               min={0}
               max={99}
+              size="sm"
               aria-label={`كمية ${product.name}`}
               onChange={(next) => setQuantity(product.id, next)}
-              className="h-10"
             />
           ) : (
             <button

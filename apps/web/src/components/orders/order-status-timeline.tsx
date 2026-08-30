@@ -33,14 +33,21 @@ function stepState(
   return "upcoming";
 }
 
-function historyNote(
+function historyTimestamp(
   status: OrderStatus,
   history: OrderStatusEvent[] | undefined,
 ): string | undefined {
   const match = [...(history ?? [])]
     .reverse()
     .find((event) => event.status === status);
-  return match?.note;
+  if (!match?.timestamp) return undefined;
+  try {
+    return new Intl.DateTimeFormat("ar-IQ", {
+      timeStyle: "short",
+    }).format(new Date(match.timestamp));
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -65,11 +72,13 @@ export function OrderStatusTimeline({
         const state = stepState(status, currentStatus);
         const isLast = index === steps.length - 1;
         const label = getOrderStatusLabel(status);
+        const stamped = historyTimestamp(status, statusHistory);
         const description =
           state === "current"
-            ? "حالياً"
-            : historyNote(status, statusHistory) ??
-              getOrderStatusDescription(status);
+            ? `حالياً · ${getOrderStatusDescription(status)}`
+            : stamped
+              ? `${getOrderStatusDescription(status)} · ${stamped}`
+              : getOrderStatusDescription(status);
 
         return (
           <li
