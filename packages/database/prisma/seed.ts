@@ -209,8 +209,9 @@ async function main() {
     const bcrypt = await import("bcryptjs");
     const passwordHash = await bcrypt.hash(seedPassword, 12);
     const identifier = seedId.toLowerCase();
+    // Stable id so re-seed can rotate identifier/password without leaving a stale Admin row.
     await prisma.adminUser.upsert({
-      where: { identifier },
+      where: { id: "seed-admin-1" },
       create: {
         id: "seed-admin-1",
         identifier,
@@ -219,6 +220,7 @@ async function main() {
         isActive: true,
       },
       update: {
+        identifier,
         passwordHash,
         role: seedRole,
         isActive: true,
