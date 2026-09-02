@@ -47,7 +47,7 @@ export function DeliveryCtaSection({ className }: { className?: string }) {
                 جوعان؟ خليها علينا
               </h2>
               <p className="typo-body-s text-pretty text-on-dark/75 sm:text-base">
-                خدمة توصيل فقط — اختَر من المنيو وخلّي الطلب يوصل لباب البيت.
+                توصيل داخل الفلوجة فقط — اختَر من المنيو وخلّي الطلب يوصل لباب البيت.
               </p>
             </div>
 

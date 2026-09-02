@@ -16,6 +16,9 @@ import { createOpaqueId } from "@/lib/id";
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+const BLOB_REQUIRED_MESSAGE =
+  "رفع الصور على السيرفر يحتاج إعداد Vercel Blob (BLOB_READ_WRITE_TOKEN).";
+
 export type UploadImageResult =
   | { ok: true; url: string }
   | { ok: false; message: string };
@@ -24,6 +27,11 @@ function extForMime(mime: string): string {
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
   return "jpg";
+}
+
+/** Vercel/serverless has a read-only filesystem — local public/uploads won't work. */
+function requiresBlobStorage(): boolean {
+  return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
 }
 
 export async function uploadAdminImageAction(
@@ -51,12 +59,24 @@ export async function uploadAdminImageAction(
 
     const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
     if (token) {
-      const blob = await put(`uploads/${filename}`, bytes, {
-        access: "public",
-        contentType: file.type,
-        token,
-      });
-      return { ok: true, url: blob.url };
+      try {
+        const blob = await put(`uploads/${filename}`, bytes, {
+          access: "public",
+          contentType: file.type,
+          token,
+        });
+        return { ok: true, url: blob.url };
+      } catch (blobError) {
+        logServerError("uploadAdminImage.blob", blobError);
+        return {
+          ok: false,
+          message: "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من توكن Blob.",
+        };
+      }
+    }
+
+    if (requiresBlobStorage()) {
+      return { ok: false, message: BLOB_REQUIRED_MESSAGE };
     }
 
     const uploadDir = path.join(process.cwd(), "public", "uploads");

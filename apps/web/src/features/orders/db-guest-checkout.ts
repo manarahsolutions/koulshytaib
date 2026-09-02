@@ -7,6 +7,11 @@
 import "server-only";
 import type { PaymentMethod } from "@prisma/client";
 import { calcCouponDiscount } from "@/features/checkout/coupon-math";
+import {
+  DELIVERY_AREA,
+  DELIVERY_GOVERNORATE,
+  isPreciseAddress,
+} from "@/features/checkout/delivery-zone";
 import { applyOffersToLines } from "@/features/offers/apply-offers";
 import { BackendError } from "@/lib/db/errors";
 import { mapCustomer, mapOffer, mapOrder } from "@/lib/db/mappers";
@@ -60,6 +65,20 @@ export async function dbPlaceGuestOrderAtomic(
   }
   if (input.items.length === 0) {
     throw new BackendError("VALIDATION", "السلة فاضية");
+  }
+
+  // Fallujah-only — normalize zone server-side (ignore client variants)
+  const delivery = {
+    ...input.delivery,
+    governorate: DELIVERY_GOVERNORATE,
+    area: DELIVERY_AREA,
+    address: input.delivery.address.trim(),
+  };
+  if (!isPreciseAddress(delivery.address)) {
+    throw new BackendError(
+      "VALIDATION",
+      "اكتب عنوانك الدقيق داخل الفلوجة",
+    );
   }
 
   return prisma.$transaction(async (tx) => {
@@ -196,11 +215,11 @@ export async function dbPlaceGuestOrderAtomic(
         status: "received",
         snapshotName: name,
         snapshotPhone: phone,
-        governorate: input.delivery.governorate,
-        area: input.delivery.area,
-        address: input.delivery.address,
-        landmark: input.delivery.landmark ?? null,
-        notes: input.delivery.notes ?? null,
+        governorate: delivery.governorate,
+        area: delivery.area,
+        address: delivery.address,
+        landmark: delivery.landmark ?? null,
+        notes: delivery.notes ?? null,
         paymentMethod: input.paymentMethod,
         subtotal,
         deliveryFee,

@@ -20,14 +20,18 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Radio } from "@/components/ui/radio";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   selectCartSubtotal,
   useCartStore,
 } from "@/features/cart/cart-store";
 import { useCartHydrated } from "@/features/cart/use-cart-hydrated";
-import { IRAQ_GOVERNORATES } from "@/features/checkout/governorates";
+import {
+  DELIVERY_AREA,
+  DELIVERY_CITY,
+  DELIVERY_GOVERNORATE,
+  isPreciseAddress,
+} from "@/features/checkout/delivery-zone";
 import {
   normalizeIraqiPhone,
   sanitizePhoneInput,
@@ -57,8 +61,6 @@ import type {
 type FormValues = {
   name: string;
   phone: string;
-  governorate: string;
-  area: string;
   address: string;
   landmark: string;
   deliveryNotes: string;
@@ -74,8 +76,6 @@ type FormErrors = Partial<Record<FieldKey, string>> & {
 const INITIAL: FormValues = {
   name: "",
   phone: "",
-  governorate: "",
-  area: "",
   address: "",
   landmark: "",
   deliveryNotes: "",
@@ -93,16 +93,9 @@ function validate(values: FormValues): FormErrors {
     errors.phone = "تأكد من رقم الهاتف";
   }
 
-  if (!values.governorate) {
-    errors.governorate = "اختار المحافظة";
-  }
-
-  if (!values.area.trim()) {
-    errors.area = "اكتب المنطقة";
-  }
-
-  if (!values.address.trim()) {
-    errors.address = "اكتب عنوان التوصيل";
+  if (!isPreciseAddress(values.address)) {
+    errors.address =
+      "اكتب عنوانك الدقيق داخل الفلوجة (الحي، الشارع، ورقم الدار أو أقرب نقطة)";
   }
 
   if (!values.paymentMethod) {
@@ -112,14 +105,7 @@ function validate(values: FormValues): FormErrors {
   return errors;
 }
 
-const FIELD_ORDER: FieldKey[] = [
-  "name",
-  "phone",
-  "governorate",
-  "area",
-  "address",
-  "paymentMethod",
-];
+const FIELD_ORDER: FieldKey[] = ["name", "phone", "address", "paymentMethod"];
 
 export function CheckoutPageClient() {
   const router = useRouter();
@@ -143,8 +129,6 @@ export function CheckoutPageClient() {
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
-  const governorateRef = useRef<HTMLSelectElement>(null);
-  const areaRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLTextAreaElement>(null);
   const paymentRef = useRef<HTMLInputElement>(null);
 
@@ -224,8 +208,6 @@ export function CheckoutPageClient() {
       const map = {
         name: nameRef,
         phone: phoneRef,
-        governorate: governorateRef,
-        area: areaRef,
         address: addressRef,
         paymentMethod: paymentRef,
       } as const;
@@ -263,8 +245,8 @@ export function CheckoutPageClient() {
           phone,
         },
         delivery: {
-          governorate: values.governorate,
-          area: values.area.trim(),
+          governorate: DELIVERY_GOVERNORATE,
+          area: DELIVERY_AREA,
           address: values.address.trim(),
           landmark: values.landmark.trim() || undefined,
           notes: values.deliveryNotes.trim() || undefined,
@@ -355,8 +337,6 @@ export function CheckoutPageClient() {
 
   const nameId = `${formId}-name`;
   const phoneId = `${formId}-phone`;
-  const govId = `${formId}-governorate`;
-  const areaId = `${formId}-area`;
   const addressId = `${formId}-address`;
   const landmarkId = `${formId}-landmark`;
   const notesId = `${formId}-notes`;
@@ -437,58 +417,17 @@ export function CheckoutPageClient() {
             </FormSection>
 
             <FormSection title="عنوان التوصيل">
-              <Field
-                id={govId}
-                label="المحافظة"
-                required
-                error={errors.governorate}
-              >
-                <Select
-                  ref={governorateRef}
-                  id={govId}
-                  name="address-level1"
-                  autoComplete="address-level1"
-                  value={values.governorate}
-                  onChange={(e) => setField("governorate", e.target.value)}
-                  invalid={Boolean(errors.governorate)}
-                  aria-required
-                  aria-describedby={fieldDescribedBy(
-                    govId,
-                    errors.governorate,
-                  )}
-                >
-                  <option value="">اختار المحافظة</option>
-                  {IRAQ_GOVERNORATES.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <Field
-                id={areaId}
-                label="المنطقة"
-                required
-                error={errors.area}
-              >
-                <Input
-                  ref={areaRef}
-                  id={areaId}
-                  name="address-level2"
-                  autoComplete="off"
-                  placeholder="مثلاً: المنصور"
-                  value={values.area}
-                  onChange={(e) => setField("area", e.target.value)}
-                  invalid={Boolean(errors.area)}
-                  aria-required
-                  aria-describedby={fieldDescribedBy(areaId, errors.area)}
-                />
-              </Field>
+              <p className="rounded-2xl border border-border-soft bg-surface-warm px-3 py-2.5 text-sm text-text">
+                التوصيل حالياً داخل{" "}
+                <span className="font-semibold text-brand-navy">
+                  {DELIVERY_CITY}
+                </span>{" "}
+                فقط.
+              </p>
 
               <Field
                 id={addressId}
-                label="العنوان"
+                label="العنوان الدقيق"
                 required
                 error={errors.address}
               >
@@ -497,8 +436,8 @@ export function CheckoutPageClient() {
                   id={addressId}
                   name="street-address"
                   autoComplete="street-address"
-                  rows={3}
-                  placeholder="اسم الشارع، المحلة، رقم الدار..."
+                  rows={4}
+                  placeholder="مثلاً: حي الجولان، شارع المدارس، دار رقم 12، قرب مسجد…"
                   value={values.address}
                   onChange={(e) => setField("address", e.target.value)}
                   invalid={Boolean(errors.address)}
@@ -515,7 +454,7 @@ export function CheckoutPageClient() {
                   id={landmarkId}
                   name="landmark"
                   autoComplete="off"
-                  placeholder="مثلاً: قرب ..."
+                  placeholder="مثلاً: قرب مجمع … أو مدرسة …"
                   value={values.landmark}
                   onChange={(e) => setField("landmark", e.target.value)}
                 />

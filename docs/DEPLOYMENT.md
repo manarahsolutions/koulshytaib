@@ -82,7 +82,7 @@ Project → **Settings → Environment Variables** — أضف للبيئات Pro
 | `NOTIFICATION_PROVIDER` | `mock` (الإرسال الآلي؛ deeplink منفصل) |
 | `NOTIFICATION_DEFAULT_CHANNEL` | `WHATSAPP` أو `SMS` (تسمية القناة) |
 | `KITCHEN_WHATSAPP_E164` | رقم مطبخ واتساب بدون `+` (مثال `9647XXXXXXXXX`) — لتثبيت الطلب عبر wa.me |
-| `BLOB_READ_WRITE_TOKEN` | اختياري — رفع صور الأدمن عبر Vercel Blob في الإنتاج |
+| `BLOB_READ_WRITE_TOKEN` | **مطلوب لرفع صور الأدمن على Vercel** — أنشئ Blob Store من Storage ثم انسخ التوكن هنا |
 
 ثم **Redeploy**.
 
