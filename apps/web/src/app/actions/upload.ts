@@ -58,19 +58,33 @@ export async function uploadAdminImageAction(
 
     const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
     if (token) {
+      if (!token.startsWith("vercel_blob_rw_")) {
+        return {
+          ok: false,
+          message:
+            "قيمة BLOB_READ_WRITE_TOKEN غير صحيحة — لازم تبدأ بـ vercel_blob_rw_ (انسخها من Storage → Blob → .env.local).",
+        };
+      }
       try {
+        // Prefer env token (SDK default); explicit pass only as fallback.
         const blob = await put(`uploads/${filename}`, bytes, {
           access: "public",
-          contentType: file.type,
+          contentType: file.type || undefined,
+          addRandomSuffix: true,
           token,
         });
         return { ok: true, url: blob.url };
       } catch (blobError) {
         logServerError("uploadAdminImage.blob", blobError);
+        const detail =
+          blobError instanceof Error
+            ? blobError.message.replace(/^Vercel Blob:\s*/i, "").trim()
+            : "";
         return {
           ok: false,
-          message:
-            "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من توكن Blob.",
+          message: detail
+            ? `فشل رفع Blob: ${detail}`
+            : "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من توكن Blob ثم أعد نشر المشروع (Redeploy).",
         };
       }
     }
