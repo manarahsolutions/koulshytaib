@@ -1,6 +1,6 @@
 "use client";
 
-import { ListOrdered, Package, Plus, Tags } from "lucide-react";
+import { Package, Plus, Tags } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,7 +10,6 @@ import {
   setProductAvailabilityAction,
   setProductVisibilityAction,
 } from "@/app/actions/backend";
-import { AdminProductReorder } from "@/components/admin/admin-product-reorder";
 import { ProductFilters } from "@/components/admin/product-filters";
 import { ProductCards, ProductTable } from "@/components/admin/product-list";
 import { Button } from "@/components/ui/button";
@@ -48,8 +47,8 @@ export function AdminProductsClient() {
   const [status, setStatus] = useState<ProductListFilter>("all");
   const [categoryId, setCategoryId] = useState("all");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reorderBusy, setReorderBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [reorderOpen, setReorderOpen] = useState(false);
 
   const allProducts = useProducts();
   const categories = useCategories();
@@ -78,23 +77,34 @@ export function AdminProductsClient() {
     }
   };
 
+  const onReorder = (catId: string, orderedIds: string[]) => {
+    void (async () => {
+      setReorderBusy(true);
+      try {
+        const result = await runAdminMutation({
+          db: () => reorderProductsAction(catId, orderedIds),
+          memory: () => reorderProductsInCategory(catId, orderedIds),
+          onDbSuccess: async () => {
+            await refreshCatalogCache();
+          },
+        });
+        if (!result.ok) flash(result.message);
+      } finally {
+        setReorderBusy(false);
+      }
+    })();
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-brand-navy">المنتجات</h1>
           <p className="mt-1 text-sm text-text-muted">
-            إدارة المنتجات الظاهرة في منيو كلشي طيب
+            اسحب الصف داخل الجدول لترتيب المنتجات ضمن نفس التصنيف
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            startIcon={<ListOrdered />}
-            onClick={() => setReorderOpen((v) => !v)}
-          >
-            {reorderOpen ? "إخفاء الترتيب" : "ترتيب القائمة"}
-          </Button>
           <Button
             variant="outline"
             startIcon={<Tags />}
@@ -118,25 +128,6 @@ export function AdminProductsClient() {
         >
           {toast}
         </p>
-      ) : null}
-
-      {reorderOpen ? (
-        <AdminProductReorder
-          categories={categories}
-          products={allProducts}
-          onClose={() => setReorderOpen(false)}
-          onSave={async (catId, orderedIds) => {
-            const result = await runAdminMutation({
-              db: () => reorderProductsAction(catId, orderedIds),
-              memory: () => reorderProductsInCategory(catId, orderedIds),
-              onDbSuccess: async () => {
-                await refreshCatalogCache();
-              },
-            });
-            flash(result.ok ? "تم حفظ ترتيب المنتجات" : result.message);
-            return result.ok;
-          }}
-        />
       ) : null}
 
       <ProductFilters
@@ -180,7 +171,10 @@ export function AdminProductsClient() {
         <>
           <ProductTable
             products={products}
+            allProducts={allProducts}
             busyId={busyId}
+            reorderBusy={reorderBusy}
+            onReorder={onReorder}
             onToggleAvailable={(product) =>
               void withBusy(product, async () => {
                 const result = await runAdminMutation({
@@ -211,7 +205,10 @@ export function AdminProductsClient() {
           />
           <ProductCards
             products={products}
+            allProducts={allProducts}
             busyId={busyId}
+            reorderBusy={reorderBusy}
+            onReorder={onReorder}
             onToggleAvailable={(product) =>
               void withBusy(product, async () => {
                 const result = await runAdminMutation({
