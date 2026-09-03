@@ -1,6 +1,6 @@
 "use client";
 
-import { Gift, Home, Percent, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { Home, Percent, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,7 +18,6 @@ const ICONS = {
   home: Home,
   menu: UtensilsCrossed,
   offers: Percent,
-  rewards: Gift,
   cart: ShoppingBag,
 } as const;
 

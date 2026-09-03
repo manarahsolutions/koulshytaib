@@ -61,10 +61,11 @@ export function AdminLoyaltyRewardsClient({
       <AdminPanel>
         <form onSubmit={(e) => void onCreate(e)} className="space-y-3">
           <h2 className="text-base font-semibold text-brand-navy">
-            مكافآت الاستبدال
+            كتالوج المكافآت
           </h2>
           <p className="text-sm text-text-muted">
-            كتالوج يظهر للزبون في صفحة المكافآت عند الاستبدال بالنقاط.
+            مرجع للطاقم: عند التواصل مع الزبون بلّغه برصيده واقترح مكافأة، ثم
+            خصم النقاط يدوياً من ملف الولاء — بدون استبدال ذاتي للزبون.
           </p>
           <Input
             id={`${formId}-title`}

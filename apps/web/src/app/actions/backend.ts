@@ -25,7 +25,6 @@ import {
 } from "@/features/offers/db-offer-repository";
 import {
   dbFindCustomerById,
-  dbFindCustomerByPhone,
   dbListCustomers,
   dbRecordActivity,
   dbSearchCustomers,
@@ -67,7 +66,6 @@ import {
   dbCreateLoyaltyReward,
   dbDeleteLoyaltyReward,
   dbListLoyaltyRewards,
-  dbRedeemLoyaltyReward,
   dbUpdateLoyaltyReward,
 } from "@/features/loyalty/db-loyalty-rewards";
 import {
@@ -1008,18 +1006,14 @@ export async function updateAdminRoleAction(id: string, role: AdminRole) {
   }
 }
 
-/* ─── Loyalty rewards ───────────────────────────────────────── */
+/* ─── Loyalty rewards (admin catalog — no guest self-redeem) ── */
 
-export async function listLoyaltyRewardsAction(opts?: { activeOnly?: boolean }) {
+export async function listLoyaltyRewardsAction() {
   try {
-    if (opts?.activeOnly) {
-      requireDb();
-    } else {
-      await requireAdminRole(OPERATE_ROLES);
-    }
+    await requireAdminRole(OPERATE_ROLES);
     return {
       ok: true as const,
-      data: await dbListLoyaltyRewards({ activeOnly: opts?.activeOnly }),
+      data: await dbListLoyaltyRewards(),
     };
   } catch (error) {
     return fail(error, "listLoyaltyRewards");
@@ -1036,7 +1030,6 @@ export async function createLoyaltyRewardAction(input: {
     await requireAdminRole(OPERATE_ROLES);
     const data = await dbCreateLoyaltyReward(input);
     revalidatePath("/admin/loyalty");
-    revalidatePath("/rewards");
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "createLoyaltyReward");
@@ -1056,7 +1049,6 @@ export async function updateLoyaltyRewardAction(
     await requireAdminRole(OPERATE_ROLES);
     const data = await dbUpdateLoyaltyReward(id, patch);
     revalidatePath("/admin/loyalty");
-    revalidatePath("/rewards");
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "updateLoyaltyReward");
@@ -1068,66 +1060,9 @@ export async function deleteLoyaltyRewardAction(id: string) {
     await requireAdminRole(OWNER_ONLY);
     await dbDeleteLoyaltyReward(id);
     revalidatePath("/admin/loyalty");
-    revalidatePath("/rewards");
     return { ok: true as const, data: true };
   } catch (error) {
     return fail(error, "deleteLoyaltyReward");
-  }
-}
-
-export async function lookupLoyaltyForRedeemAction(phone: string) {
-  try {
-    requireDb();
-    const customer = await dbFindCustomerByPhone(phone);
-    if (!customer) {
-      return { ok: false as const, message: "ما لكينا زبون بهذا الرقم" };
-    }
-    const [account, rewards, config] = await Promise.all([
-      dbGetLoyaltyAccount(customer.id),
-      dbListLoyaltyRewards({ activeOnly: true }),
-      dbGetLoyaltyConfig(),
-    ]);
-    return {
-      ok: true as const,
-      data: {
-        customer: {
-          id: customer.id,
-          name: customer.name,
-          phone: customer.phone,
-        },
-        balance: account?.pointsBalance ?? 0,
-        rewards,
-        loyaltyEnabled: config.enabled,
-      },
-    };
-  } catch (error) {
-    return fail(error, "lookupLoyaltyForRedeem");
-  }
-}
-
-export async function redeemLoyaltyRewardAction(input: {
-  phone: string;
-  rewardId: string;
-}) {
-  try {
-    requireDb();
-    const config = await dbGetLoyaltyConfig();
-    if (!config.enabled) {
-      return { ok: false as const, message: "نظام الولاء غير مفعّل حالياً" };
-    }
-    const customer = await dbFindCustomerByPhone(input.phone);
-    if (!customer) {
-      return { ok: false as const, message: "ما لكينا زبون بهذا الرقم" };
-    }
-    const data = await dbRedeemLoyaltyReward({
-      customerId: customer.id,
-      rewardId: input.rewardId,
-    });
-    revalidatePath("/rewards");
-    revalidatePath("/admin/loyalty");
-    return { ok: true as const, data };
-  } catch (error) {
-    return fail(error, "redeemLoyaltyReward");
   }
 }
 
