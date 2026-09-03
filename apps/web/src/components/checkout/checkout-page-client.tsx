@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -42,6 +43,7 @@ import {
 } from "@/features/checkout/pricing";
 import {
   databaseStatusAction,
+  getPublicCheckoutSettingsAction,
   placeGuestOrderAction,
   validateCouponAction,
 } from "@/app/actions/backend";
@@ -126,6 +128,7 @@ export function CheckoutPageClient() {
   } | null>(null);
   const [couponMessage, setCouponMessage] = useState<string | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(DELIVERY_FEE_IQD);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -151,9 +154,16 @@ export function CheckoutPageClient() {
 
   const totals = calcCheckoutTotalsWithCoupon({
     subtotal,
-    deliveryFee: DELIVERY_FEE_IQD,
+    deliveryFee,
     couponDiscount: appliedCoupon?.discount ?? 0,
   });
+
+  useEffect(() => {
+    void (async () => {
+      const result = await getPublicCheckoutSettingsAction();
+      if (result.ok) setDeliveryFee(result.data.deliveryFeeIqd);
+    })();
+  }, []);
 
   const applyCoupon = useCallback(async () => {
     const code = couponInput.trim();

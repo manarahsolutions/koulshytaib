@@ -25,6 +25,7 @@ import {
 } from "@/features/offers/db-offer-repository";
 import {
   dbFindCustomerById,
+  dbFindCustomerByPhone,
   dbListCustomers,
   dbRecordActivity,
   dbSearchCustomers,
@@ -55,7 +56,41 @@ import {
   dbSetCouponActive,
   dbValidateCouponForSubtotal,
 } from "@/features/coupons/db-coupon-repository";
+import {
+  dbCreateReel,
+  dbDeleteReel,
+  dbListReels,
+  dbMoveReel,
+  dbSetReelActive,
+} from "@/features/reels/db-reel-repository";
+import {
+  dbCreateLoyaltyReward,
+  dbDeleteLoyaltyReward,
+  dbListLoyaltyRewards,
+  dbRedeemLoyaltyReward,
+  dbUpdateLoyaltyReward,
+} from "@/features/loyalty/db-loyalty-rewards";
+import {
+  dbGetRestaurantSettings,
+  dbUpsertRestaurantSettings,
+} from "@/features/settings/db-settings-repository";
+import type { RestaurantSettings } from "@/features/settings/types";
+import {
+  dbCreateAdminUser,
+  dbListAdmins,
+  dbSetAdminActive,
+  dbUpdateAdminRole,
+} from "@/features/admin-auth/db-admin-repository";
+import { hashPassword } from "@/features/admin-auth/password";
+import { OWNER_ONLY, OPERATE_ROLES } from "@/features/admin-auth/permissions";
+import { requireAdminRole } from "@/features/admin-auth/authorization";
 import { dbGetAnalyticsSnapshot } from "@/features/analytics/db-analytics";
+import {
+  dbGetExtendedAnalytics,
+  dbListLeads,
+  type AnalyticsRangeInput,
+  type LeadsFilter,
+} from "@/features/analytics/db-analytics-extended";
 import { setLoyaltyConfig } from "@/features/loyalty/loyalty-service";
 import type { LoyaltyConfig } from "@/features/loyalty/types";
 
@@ -70,11 +105,10 @@ import {
   buildWaMeUrl,
   getKitchenWhatsAppE164FromEnv,
   iraqiLocalToE164,
+  sanitizeE164Digits,
 } from "@/features/notifications/whatsapp-deeplink";
 import { formatOrderRefForMessage } from "@/features/notifications/templates";
-import { DELIVERY_FEE_IQD } from "@/features/checkout/pricing";
-import { requireAdmin } from "@/features/admin-auth/authorization";
-import { AuthError } from "@/features/admin-auth/types";
+import { AuthError, type AdminRole } from "@/features/admin-auth/types";
 import { BackendError, logServerError, toUserMessage } from "@/lib/db/errors";
 import { isDatabaseConfigured } from "@/lib/db/prisma";
 import { normalizeIraqiPhone } from "@/lib/format/phone";
@@ -87,6 +121,28 @@ import type {
 import type { CreateOfferInput, UpdateOfferInput } from "@/features/offers/types";
 import type { Order, OrderStatus, PaymentMethodId } from "@/types/order";
 import type { NotificationRecord } from "@/features/notifications/types";
+
+async function resolveKitchenWhatsAppE164(): Promise<string | null> {
+  if (isDatabaseConfigured()) {
+    try {
+      const settings = await dbGetRestaurantSettings();
+      const fromSettings = sanitizeE164Digits(settings.kitchenWhatsappE164);
+      if (fromSettings) return fromSettings;
+    } catch (error) {
+      logServerError("resolveKitchenWhatsApp", error);
+    }
+  }
+  return getKitchenWhatsAppE164FromEnv();
+}
+
+async function resolveDeliveryFeeIqd(): Promise<number> {
+  if (!isDatabaseConfigured()) {
+    const { DELIVERY_FEE_IQD } = await import("@/features/checkout/pricing");
+    return DELIVERY_FEE_IQD;
+  }
+  const settings = await dbGetRestaurantSettings();
+  return settings.deliveryFeeIqd;
+}
 
 export type ActionResult<T> =
   | { ok: true; data: T }
@@ -109,10 +165,10 @@ function requireDb(): void {
   }
 }
 
-/** Admin-only: DB must be up and session must be valid. */
+/** Admin-only: DB must be up and session must allow operations (STAFF+). */
 async function requireAdminDb(): Promise<void> {
   requireDb();
-  await requireAdmin();
+  await requireAdminRole(OPERATE_ROLES);
 }
 
 /* ─── Catalog reads ─────────────────────────────────────────── */
@@ -350,7 +406,7 @@ export async function placeGuestOrderAction(
       delivery: input.delivery,
       paymentMethod: input.paymentMethod,
       items: input.items,
-      deliveryFee: DELIVERY_FEE_IQD,
+      deliveryFee: await resolveDeliveryFeeIqd(),
       couponCode: input.couponCode?.trim() || undefined,
     });
 
@@ -501,7 +557,7 @@ export async function getKitchenOrderWhatsAppLinkAction(
   order: Order,
 ): Promise<ActionResult<{ url: string | null }>> {
   try {
-    const kitchenE164 = getKitchenWhatsAppE164FromEnv();
+    const kitchenE164 = await resolveKitchenWhatsAppE164();
     if (!kitchenE164) {
       return { ok: true, data: { url: null } };
     }
@@ -746,12 +802,359 @@ export async function validateCouponAction(code: string, subtotal: number) {
   }
 }
 
-export async function fetchAnalyticsAction() {
+export async function fetchAnalyticsAction(range?: AnalyticsRangeInput) {
   try {
-    await requireAdminDb();
+    await requireAdminRole(OPERATE_ROLES);
+    if (range) {
+      return { ok: true as const, data: await dbGetExtendedAnalytics(range) };
+    }
     return { ok: true as const, data: await dbGetAnalyticsSnapshot() };
   } catch (error) {
     return fail(error, "fetchAnalytics");
+  }
+}
+
+export async function fetchLeadsAction(filter?: LeadsFilter) {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    return { ok: true as const, data: await dbListLeads(filter ?? {}) };
+  } catch (error) {
+    return fail(error, "fetchLeads");
+  }
+}
+
+export async function listReelsAction() {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    return { ok: true as const, data: await dbListReels() };
+  } catch (error) {
+    return fail(error, "listReels");
+  }
+}
+
+export async function createReelAction(input: {
+  title: string;
+  instagramUrl: string;
+  thumbnailUrl?: string;
+  productId?: string;
+}) {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    const data = await dbCreateReel(input);
+    revalidatePath("/admin/reels");
+    revalidatePath("/");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "createReel");
+  }
+}
+
+export async function setReelActiveAction(id: string, active: boolean) {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    const data = await dbSetReelActive(id, active);
+    revalidatePath("/admin/reels");
+    revalidatePath("/");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "setReelActive");
+  }
+}
+
+export async function moveReelAction(id: string, direction: "up" | "down") {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    const data = await dbMoveReel(id, direction);
+    revalidatePath("/admin/reels");
+    revalidatePath("/");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "moveReel");
+  }
+}
+
+export async function deleteReelAction(id: string) {
+  try {
+    await requireAdminRole(OWNER_ONLY);
+    await dbDeleteReel(id);
+    revalidatePath("/admin/reels");
+    revalidatePath("/");
+    return { ok: true as const, data: true };
+  } catch (error) {
+    return fail(error, "deleteReel");
+  }
+}
+
+export async function fetchActiveReelsAction() {
+  try {
+    requireDb();
+    const rows = await dbListReels({ activeOnly: true });
+    return { ok: true as const, data: rows };
+  } catch (error) {
+    return fail(error, "fetchActiveReels");
+  }
+}
+
+/* ─── Settings + admins (OWNER) ─────────────────────────────── */
+
+export async function getPublicCheckoutSettingsAction() {
+  try {
+    requireDb();
+    const settings = await dbGetRestaurantSettings();
+    return {
+      ok: true as const,
+      data: {
+        deliveryFeeIqd: settings.deliveryFeeIqd,
+        hoursText: settings.hoursText,
+        displayName: settings.displayName,
+      },
+    };
+  } catch (error) {
+    return fail(error, "getPublicCheckoutSettings");
+  }
+}
+
+export async function getRestaurantSettingsAction() {
+  try {
+    await requireAdminRole(OWNER_ONLY);
+    return { ok: true as const, data: await dbGetRestaurantSettings() };
+  } catch (error) {
+    return fail(error, "getRestaurantSettings");
+  }
+}
+
+export async function updateRestaurantSettingsAction(
+  patch: Partial<RestaurantSettings>,
+) {
+  try {
+    await requireAdminRole(OWNER_ONLY);
+    const data = await dbUpsertRestaurantSettings(patch);
+    revalidatePath("/admin/settings");
+    revalidatePath("/cart");
+    revalidatePath("/checkout");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "updateRestaurantSettings");
+  }
+}
+
+export async function listAdminsAction() {
+  try {
+    await requireAdminRole(OWNER_ONLY);
+    return { ok: true as const, data: await dbListAdmins() };
+  } catch (error) {
+    return fail(error, "listAdmins");
+  }
+}
+
+export async function createAdminAccountAction(input: {
+  identifier: string;
+  password: string;
+  role: AdminRole;
+}) {
+  try {
+    await requireAdminRole(OWNER_ONLY);
+    const identifier = input.identifier.trim();
+    if (!identifier) {
+      return { ok: false as const, message: "اكتب معرف الدخول" };
+    }
+    if (input.password.length < 8) {
+      return { ok: false as const, message: "كلمة المرور لازم 8 أحرف على الأقل" };
+    }
+    if (!["OWNER", "MANAGER", "STAFF"].includes(input.role)) {
+      return { ok: false as const, message: "دور غير صالح" };
+    }
+    const passwordHash = await hashPassword(input.password);
+    const data = await dbCreateAdminUser({
+      identifier,
+      passwordHash,
+      role: input.role,
+    });
+    revalidatePath("/admin/settings");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "createAdminAccount");
+  }
+}
+
+export async function setAdminActiveAction(id: string, isActive: boolean) {
+  try {
+    const actor = await requireAdminRole(OWNER_ONLY);
+    if (actor.adminId === id && !isActive) {
+      return { ok: false as const, message: "ما تكدر تعطّل حسابك الحالي" };
+    }
+    const data = await dbSetAdminActive(id, isActive);
+    revalidatePath("/admin/settings");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "setAdminActive");
+  }
+}
+
+export async function updateAdminRoleAction(id: string, role: AdminRole) {
+  try {
+    const actor = await requireAdminRole(OWNER_ONLY);
+    if (actor.adminId === id && role !== "OWNER") {
+      return {
+        ok: false as const,
+        message: "ما تكدر تخفّض دور حسابك الحالي عن مالك",
+      };
+    }
+    const data = await dbUpdateAdminRole(id, role);
+    revalidatePath("/admin/settings");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "updateAdminRole");
+  }
+}
+
+/* ─── Loyalty rewards ───────────────────────────────────────── */
+
+export async function listLoyaltyRewardsAction(opts?: { activeOnly?: boolean }) {
+  try {
+    if (opts?.activeOnly) {
+      requireDb();
+    } else {
+      await requireAdminRole(OPERATE_ROLES);
+    }
+    return {
+      ok: true as const,
+      data: await dbListLoyaltyRewards({ activeOnly: opts?.activeOnly }),
+    };
+  } catch (error) {
+    return fail(error, "listLoyaltyRewards");
+  }
+}
+
+export async function createLoyaltyRewardAction(input: {
+  title: string;
+  description?: string;
+  pointsCost: number;
+  active?: boolean;
+}) {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    const data = await dbCreateLoyaltyReward(input);
+    revalidatePath("/admin/loyalty");
+    revalidatePath("/rewards");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "createLoyaltyReward");
+  }
+}
+
+export async function updateLoyaltyRewardAction(
+  id: string,
+  patch: Partial<{
+    title: string;
+    description: string | null;
+    pointsCost: number;
+    active: boolean;
+  }>,
+) {
+  try {
+    await requireAdminRole(OPERATE_ROLES);
+    const data = await dbUpdateLoyaltyReward(id, patch);
+    revalidatePath("/admin/loyalty");
+    revalidatePath("/rewards");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "updateLoyaltyReward");
+  }
+}
+
+export async function deleteLoyaltyRewardAction(id: string) {
+  try {
+    await requireAdminRole(OWNER_ONLY);
+    await dbDeleteLoyaltyReward(id);
+    revalidatePath("/admin/loyalty");
+    revalidatePath("/rewards");
+    return { ok: true as const, data: true };
+  } catch (error) {
+    return fail(error, "deleteLoyaltyReward");
+  }
+}
+
+export async function lookupLoyaltyForRedeemAction(phone: string) {
+  try {
+    requireDb();
+    const customer = await dbFindCustomerByPhone(phone);
+    if (!customer) {
+      return { ok: false as const, message: "ما لكينا زبون بهذا الرقم" };
+    }
+    const [account, rewards, config] = await Promise.all([
+      dbGetLoyaltyAccount(customer.id),
+      dbListLoyaltyRewards({ activeOnly: true }),
+      dbGetLoyaltyConfig(),
+    ]);
+    return {
+      ok: true as const,
+      data: {
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+        },
+        balance: account?.pointsBalance ?? 0,
+        rewards,
+        loyaltyEnabled: config.enabled,
+      },
+    };
+  } catch (error) {
+    return fail(error, "lookupLoyaltyForRedeem");
+  }
+}
+
+export async function redeemLoyaltyRewardAction(input: {
+  phone: string;
+  rewardId: string;
+}) {
+  try {
+    requireDb();
+    const config = await dbGetLoyaltyConfig();
+    if (!config.enabled) {
+      return { ok: false as const, message: "نظام الولاء غير مفعّل حالياً" };
+    }
+    const customer = await dbFindCustomerByPhone(input.phone);
+    if (!customer) {
+      return { ok: false as const, message: "ما لكينا زبون بهذا الرقم" };
+    }
+    const data = await dbRedeemLoyaltyReward({
+      customerId: customer.id,
+      rewardId: input.rewardId,
+    });
+    revalidatePath("/rewards");
+    revalidatePath("/admin/loyalty");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "redeemLoyaltyReward");
+  }
+}
+
+/**
+ * Admin: wa.me kitchen link for an order (by id).
+ */
+export async function getAdminKitchenWhatsAppLinkAction(
+  orderId: string,
+): Promise<ActionResult<{ url: string }>> {
+  try {
+    await requireAdminDb();
+    const order = await dbGetOrderById(orderId);
+    if (!order) {
+      return { ok: false, message: "ما لكينا هذا الطلب" };
+    }
+    const kitchenE164 = await resolveKitchenWhatsAppE164();
+    if (!kitchenE164) {
+      return {
+        ok: false,
+        message: "رقم واتساب المطبخ غير مضبوط — عدّله من الإعدادات",
+      };
+    }
+    const text = buildKitchenOrderMessage(order);
+    const url = buildWaMeUrl(kitchenE164, text);
+    return { ok: true, data: { url } };
+  } catch (error) {
+    return fail(error, "getAdminKitchenWhatsAppLink");
   }
 }
 

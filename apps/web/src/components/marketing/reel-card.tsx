@@ -20,6 +20,8 @@ export function ReelCard({ reel, className }: ReelCardProps) {
   const productHref = reel.productId
     ? `/product/${reel.productId}`
     : null;
+  const igHref = reel.instagramUrl?.trim() || null;
+  const mediaHref = igHref ?? productHref;
 
   return (
     <article
@@ -32,6 +34,15 @@ export function ReelCard({ reel, className }: ReelCardProps) {
       )}
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-surface-warm">
+        {mediaHref ? (
+          <a
+            href={mediaHref}
+            target={igHref ? "_blank" : undefined}
+            rel={igHref ? "noreferrer" : undefined}
+            className="absolute inset-0 z-[1]"
+            aria-label={igHref ? `فتح ريل ${reel.title}` : reel.title}
+          />
+        ) : null}
         {hasThumb && reel.thumbnail ? (
           <Image
             src={reel.thumbnail}
@@ -44,7 +55,7 @@ export function ReelCard({ reel, className }: ReelCardProps) {
           <FoodMediaPlaceholder
             className="min-h-full"
             intent="reel"
-            label={reel.label ?? "لقطة من المطبخ — لاحقاً"}
+            label={reel.label ?? "لقطة من المطبخ"}
             tone="cream"
           />
         )}

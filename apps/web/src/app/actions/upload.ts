@@ -4,9 +4,9 @@
 
 "use server";
 
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
-import { put } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
 import { requireAdmin } from "@/features/admin-auth/authorization";
 import { AuthError } from "@/features/admin-auth/types";
 import { logServerError, toUserMessage } from "@/lib/db/errors";
@@ -29,7 +29,6 @@ function extForMime(mime: string): string {
   return "jpg";
 }
 
-/** Vercel/serverless has a read-only filesystem — local public/uploads won't work. */
 function requiresBlobStorage(): boolean {
   return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
 }
@@ -70,7 +69,8 @@ export async function uploadAdminImageAction(
         logServerError("uploadAdminImage.blob", blobError);
         return {
           ok: false,
-          message: "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من توكن Blob.",
+          message:
+            "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من توكن Blob.",
         };
       }
     }
@@ -89,5 +89,43 @@ export async function uploadAdminImageAction(
     }
     logServerError("uploadAdminImage", error);
     return { ok: false, message: toUserMessage(error) };
+  }
+}
+
+/** Best-effort cleanup when replacing/removing an admin image. */
+export async function deleteAdminImageAction(
+  url: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await requireAdmin();
+    const trimmed = url.trim();
+    if (!trimmed) return { ok: true };
+
+    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+    if (token && /^https?:\/\//i.test(trimmed)) {
+      try {
+        await del(trimmed, { token });
+      } catch (error) {
+        logServerError("deleteAdminImage.blob", error);
+      }
+      return { ok: true };
+    }
+
+    if (trimmed.startsWith("/uploads/")) {
+      const name = path.basename(trimmed);
+      if (name && name !== "." && name !== "..") {
+        try {
+          await unlink(path.join(process.cwd(), "public", "uploads", name));
+        } catch {
+          // missing file is fine
+        }
+      }
+    }
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { ok: false, message: error.userMessage };
+    }
+    return { ok: true };
   }
 }

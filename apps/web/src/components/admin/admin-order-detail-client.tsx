@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { MessageCircle, Package } from "lucide-react";
-import { getCustomerStatusWhatsAppLinkAction } from "@/app/actions/backend";
+import {
+  getAdminKitchenWhatsAppLinkAction,
+  getCustomerStatusWhatsAppLinkAction,
+} from "@/app/actions/backend";
 import { AdminOrderNotifications } from "@/components/admin/admin-order-notifications";
 import { AdminStatusTimeline } from "@/components/admin/admin-status-timeline";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
@@ -27,6 +30,7 @@ export function AdminOrderDetailClient() {
   const order = useOrder(orderId);
   const [error, setError] = useState<string | null>(null);
   const [waBusy, setWaBusy] = useState(false);
+  const [kitchenBusy, setKitchenBusy] = useState(false);
   const [notifRefresh, setNotifRefresh] = useState(0);
 
   if (!order) {
@@ -60,6 +64,21 @@ export function AdminOrderDetailClient() {
       setNotifRefresh((n) => n + 1);
     } finally {
       setWaBusy(false);
+    }
+  };
+
+  const openKitchenWhatsApp = async () => {
+    setKitchenBusy(true);
+    setError(null);
+    try {
+      const result = await getAdminKitchenWhatsAppLinkAction(order.id);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      window.open(result.data.url, "_blank", "noopener,noreferrer");
+    } finally {
+      setKitchenBusy(false);
     }
   };
 
@@ -100,24 +119,45 @@ export function AdminOrderDetailClient() {
 
       <OrderStatusActions order={order} onError={setError} />
 
-      <div className="rounded-lg border border-border bg-surface-elevated p-4">
-        <h2 className="text-base font-semibold text-brand-navy">
-          واتساب الزبون
-        </h2>
-        <p className="mt-1 text-sm text-text-muted">
-          يفتح واتساب برسالة جاهزة حسب الحالة الحالية — أكمل الإرسال من جهازك.
-        </p>
-        <Button
-          type="button"
-          variant="secondary"
-          size="md"
-          loading={waBusy}
-          onClick={() => void openCustomerWhatsApp()}
-          className="mt-3 min-h-11 gap-2"
-        >
-          <MessageCircle className="size-4 shrink-0" aria-hidden />
-          افتح واتساب الزبون
-        </Button>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-lg border border-border bg-surface-elevated p-4">
+          <h2 className="text-base font-semibold text-brand-navy">
+            واتساب الزبون
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            يفتح واتساب برسالة جاهزة حسب الحالة الحالية — أكمل الإرسال من جهازك.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            loading={waBusy}
+            onClick={() => void openCustomerWhatsApp()}
+            className="mt-3 min-h-11 gap-2"
+          >
+            <MessageCircle className="size-4 shrink-0" aria-hidden />
+            افتح واتساب الزبون
+          </Button>
+        </div>
+        <div className="rounded-lg border border-border bg-surface-elevated p-4">
+          <h2 className="text-base font-semibold text-brand-navy">
+            واتساب المطبخ
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            رسالة ملخص الطلب للمطبخ عبر wa.me.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            loading={kitchenBusy}
+            onClick={() => void openKitchenWhatsApp()}
+            className="mt-3 min-h-11 gap-2"
+          >
+            <MessageCircle className="size-4 shrink-0" aria-hidden />
+            افتح واتساب المطبخ
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

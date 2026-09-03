@@ -1,7 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import { fetchAnalyticsAction } from "@/app/actions/backend";
+import {
+  AdminPageHeader,
+  AdminPanel,
+} from "@/components/admin/ui/admin-page-header";
+import { Button } from "@/components/ui/button";
+import { downloadCsv, toCsv } from "@/lib/csv/download-csv";
 import { formatPriceIQD } from "@/lib/format/price";
-import type { AnalyticsSnapshot } from "@/features/analytics/types";
+import type { ExtendedAnalytics } from "@/features/analytics/db-analytics-extended";
 
 const STATUS_AR: Record<string, string> = {
   received: "مستلم",
@@ -12,65 +20,174 @@ const STATUS_AR: Record<string, string> = {
   cancelled: "ملغى",
 };
 
-export type AdminAnalyticsClientProps = {
-  data: AnalyticsSnapshot;
-};
+export function AdminAnalyticsClient({
+  initial,
+}: {
+  initial: ExtendedAnalytics;
+}) {
+  const [data, setData] = useState(initial);
+  const [preset, setPreset] = useState<"day" | "week" | "month">("week");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-export function AdminAnalyticsClient({ data }: AdminAnalyticsClientProps) {
+  const reload = async (next: "day" | "week" | "month") => {
+    setBusy(true);
+    setError(null);
+    setPreset(next);
+    try {
+      const result = await fetchAnalyticsAction({ preset: next });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setData(result.data as ExtendedAnalytics);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportTop = () => {
+    downloadCsv(
+      "top-products.csv",
+      toCsv(
+        data.topProducts.map((p) => ({
+          name: p.name,
+          quantity: p.quantity,
+          revenueIqd: p.revenueIqd,
+        })),
+      ),
+    );
+  };
+
+  const maxDaily = Math.max(1, ...data.daily.map((d) => d.orders));
+
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold text-brand-navy">التحليلات</h1>
-        <p className="typo-caption mt-1 text-text-muted">
-          نظرة سريعة من الطلبات — بدون لوحة تحليلات منفصلة.
-        </p>
-      </header>
+      <AdminPageHeader
+        title="التحليلات"
+        description="تقارير من الطلبات حسب الفترة — قابلة للتصدير CSV."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {(["day", "week", "month"] as const).map((p) => (
+              <Button
+                key={p}
+                type="button"
+                size="sm"
+                variant={preset === p ? "primary" : "outline"}
+                loading={busy && preset === p}
+                onClick={() => void reload(p)}
+              >
+                {p === "day" ? "يوم" : p === "week" ? "أسبوع" : "شهر"}
+              </Button>
+            ))}
+            <Button type="button" size="sm" variant="secondary" onClick={exportTop}>
+              تصدير المنتجات CSV
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      {error ? (
+        <p className="text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="طلبات (غير ملغاة)" value={String(data.orderCount)} />
         <Stat label="ملغاة" value={String(data.cancelledCount)} />
-        <Stat label="إجمالي المبيعات" value={formatPriceIQD(data.revenueIqd)} />
+        <Stat label="الإيراد" value={formatPriceIQD(data.revenueIqd)} />
+        <Stat
+          label="AOV"
+          value={data.aov == null ? "—" : formatPriceIQD(data.aov)}
+        />
       </div>
 
-      <section>
-        <h2 className="mb-3 text-base font-semibold text-brand-navy">
-          الطلبات حسب الحالة
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="زبائن جدد" value={String(data.newCustomers)} />
+        <Stat label="زبائن عائدون" value={String(data.returningCustomers)} />
+        <Stat label="طلبات بكوبون" value={String(data.couponOrders)} />
+        <Stat
+          label="خصم كوبونات"
+          value={formatPriceIQD(data.couponDiscountTotal)}
+        />
+      </div>
+
+      <AdminPanel>
+        <h2 className="text-base font-semibold text-brand-navy">
+          الطلبات يومياً
         </h2>
-        <ul className="divide-y divide-border-soft rounded-2xl border border-border-soft bg-surface-elevated">
-          {data.byStatus.map((row) => (
+        <ul className="mt-4 flex h-32 items-end gap-1">
+          {data.daily.map((d) => (
             <li
-              key={row.status}
-              className="flex justify-between gap-3 px-4 py-2.5 text-sm"
+              key={d.day}
+              className="flex min-w-0 flex-1 flex-col items-center gap-1"
+              title={`${d.day}: ${d.orders}`}
             >
-              <span>{STATUS_AR[row.status] ?? row.status}</span>
-              <span className="tabular-nums font-semibold">{row.count}</span>
+              <span
+                className="w-full rounded-t bg-brand-primary/80"
+                style={{
+                  height: `${Math.max(4, (d.orders / maxDaily) * 100)}%`,
+                }}
+              />
             </li>
           ))}
         </ul>
-      </section>
+      </AdminPanel>
 
-      <section>
-        <h2 className="mb-3 text-base font-semibold text-brand-navy">
-          أكثر المنتجات طلباً
-        </h2>
-        {data.topProducts.length === 0 ? (
-          <p className="typo-caption text-text-muted">ماكو مبيعات بعد.</p>
-        ) : (
-          <ul className="divide-y divide-border-soft rounded-2xl border border-border-soft bg-surface-elevated">
-            {data.topProducts.map((p) => (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AdminPanel>
+          <h2 className="mb-3 text-base font-semibold text-brand-navy">
+            حسب الحالة
+          </h2>
+          <ul className="divide-y divide-border-soft">
+            {data.byStatus.map((row) => (
               <li
-                key={p.name}
-                className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-2.5 text-sm"
+                key={row.status}
+                className="flex justify-between py-2 text-sm"
               >
-                <span className="font-medium">{p.name}</span>
-                <span className="typo-caption text-text-muted">
-                  ×{p.quantity} · {formatPriceIQD(p.revenueIqd)}
-                </span>
+                <span>{STATUS_AR[row.status] ?? row.status}</span>
+                <span className="tabular-nums font-semibold">{row.count}</span>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </AdminPanel>
+        <AdminPanel>
+          <h2 className="mb-3 text-base font-semibold text-brand-navy">
+            ساعات الذروة
+          </h2>
+          <ul className="divide-y divide-border-soft">
+            {data.peakHours.map((row) => (
+              <li
+                key={row.hour}
+                className="flex justify-between py-2 text-sm"
+              >
+                <span dir="ltr">{row.hour}:00</span>
+                <span className="tabular-nums font-semibold">{row.count}</span>
+              </li>
+            ))}
+          </ul>
+        </AdminPanel>
+      </div>
+
+      <AdminPanel>
+        <h2 className="mb-3 text-base font-semibold text-brand-navy">
+          أكثر المنتجات
+        </h2>
+        <ul className="divide-y divide-border-soft">
+          {data.topProducts.map((p) => (
+            <li
+              key={p.name}
+              className="flex flex-wrap justify-between gap-2 py-2 text-sm"
+            >
+              <span className="font-medium">{p.name}</span>
+              <span className="typo-caption text-text-muted">
+                ×{p.quantity} · {formatPriceIQD(p.revenueIqd)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </AdminPanel>
     </div>
   );
 }

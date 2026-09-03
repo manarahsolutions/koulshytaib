@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { UserRound } from "lucide-react";
+import { updateCustomerAction } from "@/app/actions/backend";
 import { CustomerTypeBadge } from "@/components/admin/customer-type-badge";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
 import { StatCard } from "@/components/admin/stat-card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { countOrderItems } from "@/features/admin/dashboard-metrics";
 import { formatOrderRef } from "@/features/admin/format";
+import { upsertCustomerInCache } from "@/features/customers/customer-repository";
 import { getCustomerById } from "@/features/customers/customer-service";
 import {
   getCustomerLastDeliveredOrder,
@@ -18,10 +23,98 @@ import {
   getCustomerOrders,
   getCustomerStatusLabel,
 } from "@/features/customers/selectors";
+import type { Customer } from "@/features/customers/types";
 import { useCrmRevision } from "@/features/customers/use-crm-customers";
 import { formatIraqDateTime } from "@/lib/datetime/iraq-day";
 import { formatPriceIQD } from "@/lib/format/price";
 import { cn } from "@/lib/utils/cn";
+
+function CustomerEditForm({ customer }: { customer: Customer }) {
+  const [editName, setEditName] = useState(customer.name ?? "");
+  const [editStatus, setEditStatus] = useState<"active" | "inactive">(
+    customer.status,
+  );
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editOk, setEditOk] = useState<string | null>(null);
+
+  const onSave = async (e: FormEvent) => {
+    e.preventDefault();
+    setEditBusy(true);
+    setEditError(null);
+    setEditOk(null);
+    try {
+      const result = await updateCustomerAction(customer.id, {
+        name: editName,
+        status: editStatus,
+      });
+      if (!result.ok) {
+        setEditError(result.message);
+        return;
+      }
+      upsertCustomerInCache(result.data);
+      setEditName(result.data.name ?? "");
+      setEditStatus(result.data.status);
+      setEditOk("تم حفظ بيانات الزبون");
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  return (
+    <section
+      className="rounded-lg border border-border bg-surface-elevated p-4"
+      aria-labelledby="customer-edit-heading"
+    >
+      <h2
+        id="customer-edit-heading"
+        className="text-base font-semibold text-brand-navy"
+      >
+        تعديل البيانات
+      </h2>
+      <form onSubmit={(e) => void onSave(e)} className="mt-3 space-y-3">
+        <div>
+          <label htmlFor="cust-edit-name" className="mb-1 block text-sm">
+            الاسم
+          </label>
+          <Input
+            id="cust-edit-name"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="cust-edit-status" className="mb-1 block text-sm">
+            الحالة
+          </label>
+          <Select
+            id="cust-edit-status"
+            value={editStatus}
+            onChange={(e) =>
+              setEditStatus(e.target.value as "active" | "inactive")
+            }
+          >
+            <option value="active">نشط</option>
+            <option value="inactive">غير نشط</option>
+          </Select>
+        </div>
+        {editError ? (
+          <p className="text-sm text-danger" role="alert">
+            {editError}
+          </p>
+        ) : null}
+        {editOk ? (
+          <p className="text-sm text-success" role="status">
+            {editOk}
+          </p>
+        ) : null}
+        <Button type="submit" size="sm" loading={editBusy}>
+          حفظ
+        </Button>
+      </form>
+    </section>
+  );
+}
 
 export function AdminCustomerDetailClient() {
   const params = useParams<{ id: string }>();
@@ -95,6 +188,8 @@ export function AdminCustomerDetailClient() {
         </div>
         <CustomerTypeBadge classification={metrics.classification} />
       </div>
+
+      <CustomerEditForm key={customer.id} customer={customer} />
 
       <section
         className="rounded-lg border border-border bg-surface-elevated p-4"

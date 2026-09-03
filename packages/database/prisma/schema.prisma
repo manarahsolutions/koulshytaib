@@ -154,6 +154,7 @@ model Product {
   category    Category      @relation(fields: [categoryId], references: [id])
   offerLinks  OfferProduct[]
   orderItems  OrderItem[]
+  reels       Reel[]
 
   @@index([categoryId])
   @@index([visible, available])
@@ -320,12 +321,46 @@ model CustomerActivity {
   @@index([customerId, createdAt])
 }
 
-/// App-level config (loyalty master switch, etc.)
+/// App-level config (loyalty master switch, restaurant settings, etc.)
 model AppConfig {
   id    String @id @default("default")
   /// JSON blob for LoyaltyConfig
   loyaltyJson Json
+  /// Restaurant / delivery / hours settings JSON
+  settingsJson Json?
   updatedAt DateTime @updatedAt
+}
+
+/// Instagram Reel links for homepage (no video file upload).
+model Reel {
+  id            String   @id @default(cuid())
+  title         String
+  instagramUrl  String
+  thumbnailUrl  String?
+  productId     String?
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([active, sortOrder])
+  @@index([productId])
+}
+
+/// Redeemable loyalty rewards catalog.
+model LoyaltyReward {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  pointsCost  Int
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, sortOrder])
 }
 
 /// Checkout promo codes (percentage or fixed IQD off subtotal after offers).

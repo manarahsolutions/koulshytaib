@@ -90,3 +90,32 @@ export async function dbUpsertAdminUser(input: {
   });
   return mapAdmin(row);
 }
+
+export async function dbListAdmins(): Promise<AdminUser[]> {
+  const rows = await prisma.adminUser.findMany({
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map(mapAdmin);
+}
+
+export async function dbSetAdminActive(
+  id: string,
+  isActive: boolean,
+): Promise<AdminUser> {
+  const row = await prisma.adminUser.update({
+    where: { id },
+    data: { isActive },
+  });
+  return mapAdmin(row);
+}
+
+export async function dbUpdateAdminRole(
+  id: string,
+  role: AdminRole,
+): Promise<AdminUser> {
+  const row = await prisma.adminUser.update({
+    where: { id },
+    data: { role },
+  });
+  return mapAdmin(row);
+}
