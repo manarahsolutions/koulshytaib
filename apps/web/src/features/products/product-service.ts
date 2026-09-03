@@ -8,6 +8,7 @@ import {
   getProductById,
   listProducts,
   moveProduct as repoMoveProduct,
+  reorderProductsInCategory as repoReorderProductsInCategory,
   updateProduct as repoUpdateProduct,
 } from "@/features/products/product-repository";
 import type {
@@ -25,6 +26,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_PRODUCT_PRICE: "السعر لازم يكون رقم صحيح أكبر من صفر",
   PRODUCT_NOT_FOUND: "ما لكينا هذا المنتج",
   CATEGORY_NOT_FOUND: "ما لكينا هذا التصنيف",
+  INVALID_PRODUCT_REORDER: "ترتيب المنتجات غير مكتمل — حدّث الصفحة وحاول مرة ثانية",
 };
 
 function fail(code: string): CatalogResult<never> {
@@ -76,6 +78,13 @@ export function moveProduct(
   direction: "up" | "down",
 ): CatalogResult<Product> {
   return wrap(() => repoMoveProduct(id, direction));
+}
+
+export function reorderProductsInCategory(
+  categoryId: string,
+  orderedIds: string[],
+): CatalogResult<Product[]> {
+  return wrap(() => repoReorderProductsInCategory(categoryId, orderedIds));
 }
 
 export {

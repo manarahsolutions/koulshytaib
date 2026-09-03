@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  ArrowDown,
-  ArrowUp,
   Eye,
   EyeOff,
   PackageCheck,
@@ -26,7 +24,6 @@ export type ProductListProps = {
   products: Product[];
   onToggleAvailable: (product: Product) => void;
   onToggleVisible: (product: Product) => void;
-  onMove: (product: Product, direction: "up" | "down") => void;
   busyId?: string | null;
 };
 
@@ -34,14 +31,13 @@ export function ProductTable({
   products,
   onToggleAvailable,
   onToggleVisible,
-  onMove,
   busyId,
 }: ProductListProps) {
   const router = useRouter();
 
   return (
     <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
-      <table className="w-full min-w-[56rem] border-collapse text-sm">
+      <table className="w-full min-w-[52rem] border-collapse text-sm">
         <caption className="sr-only">قائمة المنتجات</caption>
         <thead className="bg-surface-warm text-start">
           <tr>
@@ -136,22 +132,6 @@ export function ProductTable({
                       disabled={busy}
                       onClick={() => onToggleVisible(product)}
                     />
-                    <IconButton
-                      aria-label={`رفع ترتيب ${product.name}`}
-                      icon={<ArrowUp />}
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => onMove(product, "up")}
-                    />
-                    <IconButton
-                      aria-label={`تنزيل ترتيب ${product.name}`}
-                      icon={<ArrowDown />}
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => onMove(product, "down")}
-                    />
                   </div>
                 </td>
               </tr>
@@ -167,7 +147,6 @@ export function ProductCards({
   products,
   onToggleAvailable,
   onToggleVisible,
-  onMove,
   busyId,
 }: ProductListProps) {
   const router = useRouter();
@@ -239,22 +218,6 @@ export function ProductCards({
                 size="sm"
                 disabled={busy}
                 onClick={() => onToggleVisible(product)}
-              />
-              <IconButton
-                aria-label={`رفع ترتيب ${product.name}`}
-                icon={<ArrowUp />}
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => onMove(product, "up")}
-              />
-              <IconButton
-                aria-label={`تنزيل ترتيب ${product.name}`}
-                icon={<ArrowDown />}
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => onMove(product, "down")}
               />
             </div>
           </li>

@@ -194,10 +194,35 @@ export function moveProduct(id: string, direction: "up" | "down"): Product {
   return getProductById(id)!;
 }
 
+export function reorderProductsInCategory(
+  categoryId: string,
+  orderedIds: string[],
+): Product[] {
+  ensureProductCatalogSeeded();
+  const siblings = listProducts().filter((p) => p.categoryId === categoryId);
+  const siblingIds = new Set(siblings.map((p) => p.id));
+  if (
+    !orderedIds.length ||
+    orderedIds.length !== siblings.length ||
+    orderedIds.some((id) => !siblingIds.has(id))
+  ) {
+    throw new Error("INVALID_PRODUCT_REORDER");
+  }
+  const now = new Date().toISOString();
+  orderedIds.forEach((id, index) => {
+    const current = byId.get(id);
+    if (!current) throw new Error("PRODUCT_NOT_FOUND");
+    byId.set(id, { ...current, sortOrder: index + 1, updatedAt: now });
+  });
+  emit();
+  return listProducts().filter((p) => p.categoryId === categoryId);
+}
+
 export const productRepository = {
   list: listProducts,
   getById: getProductById,
   create: createProduct,
   update: updateProduct,
   move: moveProduct,
+  reorderInCategory: reorderProductsInCategory,
 };

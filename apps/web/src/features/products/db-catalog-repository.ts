@@ -248,3 +248,40 @@ export async function dbMoveProduct(
   ]);
   return (await dbGetProductById(id))!;
 }
+
+/** Rewrite sortOrder for all products in a category (1-based display order). */
+export async function dbReorderProductsInCategory(
+  categoryId: string,
+  orderedIds: string[],
+): Promise<Product[]> {
+  if (!orderedIds.length) {
+    throw new BackendError("VALIDATION", "قائمة الترتيب فارغة");
+  }
+  const siblings = await prisma.product.findMany({
+    where: { categoryId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+  const siblingIds = new Set(siblings.map((p) => p.id));
+  if (
+    orderedIds.length !== siblings.length ||
+    orderedIds.some((id) => !siblingIds.has(id))
+  ) {
+    throw new BackendError(
+      "VALIDATION",
+      "ترتيب المنتجات غير مكتمل — حدّث الصفحة وحاول مرة ثانية",
+    );
+  }
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.product.update({
+        where: { id },
+        data: { sortOrder: index + 1 },
+      }),
+    ),
+  );
+
+  return dbListProducts().then((all) =>
+    all.filter((p) => p.categoryId === categoryId),
+  );
+}

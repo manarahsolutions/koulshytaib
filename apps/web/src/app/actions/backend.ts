@@ -13,6 +13,7 @@ import {
   dbListProducts,
   dbMoveCategory,
   dbMoveProduct,
+  dbReorderProductsInCategory,
   dbUpdateCategory,
   dbUpdateProduct,
 } from "@/features/products/db-catalog-repository";
@@ -252,6 +253,22 @@ export async function moveProductAction(
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "moveProduct");
+  }
+}
+
+export async function reorderProductsAction(
+  categoryId: string,
+  orderedIds: string[],
+) {
+  try {
+    await requireAdminDb();
+    const data = await dbReorderProductsInCategory(categoryId, orderedIds);
+    revalidatePath("/admin/products");
+    revalidatePath("/menu");
+    revalidatePath("/");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "reorderProducts");
   }
 }
 
