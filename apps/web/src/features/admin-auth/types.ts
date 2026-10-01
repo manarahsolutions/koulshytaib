@@ -3,7 +3,7 @@
  * Customer identity is separate — guests never use AdminUser.
  */
 
-export type AdminRole = "OWNER" | "MANAGER" | "STAFF";
+export type AdminRole = "MANAGER" | "CASHIER";
 
 export type AdminUser = {
   id: string;
@@ -42,9 +42,9 @@ export class AuthError extends Error {
 }
 
 export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
-  OWNER: "مالك",
   MANAGER: "مدير",
-  STAFF: "موظف",
+  CASHIER: "كاشير",
 };
 
-export const ALL_ADMIN_ROLES: AdminRole[] = ["OWNER", "MANAGER", "STAFF"];
+/** Roles assignable when creating/editing admin accounts. */
+export const ALL_ADMIN_ROLES: AdminRole[] = ["MANAGER", "CASHIER"];

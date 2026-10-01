@@ -6,6 +6,7 @@
 
 import "server-only";
 import type { PaymentMethod } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { calcCouponDiscount } from "@/features/checkout/coupon-math";
 import {
   DELIVERY_AREA,
@@ -13,8 +14,15 @@ import {
   isPreciseAddress,
 } from "@/features/checkout/delivery-zone";
 import { applyOffersToLines } from "@/features/offers/apply-offers";
+import {
+  configuredUnitPrice,
+  formatSelectionsSummary,
+  resolveAndValidateSelections,
+  selectionsToSnapshot,
+  type SelectedOption,
+} from "@/features/products/product-options";
 import { BackendError } from "@/lib/db/errors";
-import { mapCustomer, mapOffer, mapOrder } from "@/lib/db/mappers";
+import { mapCustomer, mapOffer, mapOrder, mapProduct } from "@/lib/db/mappers";
 import { interactiveTransactionOptions, prisma } from "@/lib/db/prisma";
 import { createOpaqueId } from "@/lib/id";
 import { normalizeIraqiPhone } from "@/lib/format/phone";
@@ -25,6 +33,8 @@ export type GuestCheckoutLine = {
   productId: string;
   quantity: number;
   notes?: string;
+  /** Selected catalog option ids */
+  optionIds?: string[];
 };
 
 export type GuestCheckoutInput = {
@@ -119,28 +129,49 @@ export async function dbPlaceGuestOrderAtomic(
       catalogUnitPrice: number;
       quantity: number;
       notes?: string;
+      selections: SelectedOption[];
     }> = [];
 
     for (const item of input.items) {
       const qty = Math.max(1, Math.min(99, Math.floor(item.quantity)));
-      const product = await tx.product.findUnique({
+      const productRow = await tx.product.findUnique({
         where: { id: item.productId },
+        include: {
+          optionGroups: {
+            include: { options: true },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
+        },
       });
-      if (!product || !product.visible) {
+      if (!productRow || !productRow.visible) {
         throw new BackendError("VALIDATION", "أحد المنتجات غير متاح حالياً");
       }
-      if (!product.available) {
+      if (!productRow.available) {
         throw new BackendError(
           "VALIDATION",
-          `«${product.name}» غير متوفر حالياً`,
+          `«${productRow.name}» غير متوفر حالياً`,
         );
       }
+      const product = mapProduct(productRow);
+      const validated = resolveAndValidateSelections(
+        product,
+        item.optionIds ?? [],
+      );
+      if (!validated.ok) {
+        throw new BackendError("VALIDATION", validated.message);
+      }
+      const optionSummary = formatSelectionsSummary(validated.selections);
+      const notesParts = [optionSummary, item.notes?.trim()].filter(Boolean);
       catalogLines.push({
         productId: product.id,
         name: product.name,
-        catalogUnitPrice: product.price,
+        catalogUnitPrice: configuredUnitPrice(
+          product.price,
+          validated.selections,
+        ),
         quantity: qty,
-        notes: item.notes?.trim() || undefined,
+        notes: notesParts.length ? notesParts.join(" | ") : undefined,
+        selections: validated.selections,
       });
     }
 
@@ -167,6 +198,7 @@ export async function dbPlaceGuestOrderAtomic(
         quantity: l.quantity,
         lineTotal: p.lineTotal,
         notes: l.notes,
+        optionsJson: selectionsToSnapshot(l.selections),
       };
     });
 
@@ -235,6 +267,9 @@ export async function dbPlaceGuestOrderAtomic(
             quantity: line.quantity,
             lineTotal: line.lineTotal,
             notes: line.notes ?? null,
+            optionsJson: (line.optionsJson.length
+              ? line.optionsJson
+              : Prisma.JsonNull) as Prisma.InputJsonValue,
           })),
         },
         statusHistory: {

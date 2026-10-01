@@ -54,7 +54,7 @@ export async function signInAdmin(input: {
   if (!admin.isActive) {
     throw new AuthError(
       "ADMIN_INACTIVE",
-      "هذا الحساب معطّل. تواصل مع مالك النظام.",
+      "هذا الحساب معطّل. تواصل مع المدير.",
     );
   }
 

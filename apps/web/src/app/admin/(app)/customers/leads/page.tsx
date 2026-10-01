@@ -1,17 +1,8 @@
-import { fetchLeadsAction } from "@/app/actions/backend";
-import { AdminLeadsClient } from "@/components/admin/admin-leads-client";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Leads" };
+export const metadata = { title: "الزبائن · المتابعة" };
 
-export default async function AdminLeadsPage() {
-  const result = await fetchLeadsAction({ kind: "all" });
-  if (!result.ok) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-brand-navy">Leads</h1>
-        <p className="text-sm text-danger">{result.message}</p>
-      </div>
-    );
-  }
-  return <AdminLeadsClient initial={result.data} />;
+/** Legacy path — leads live under /admin/customers?tab=leads */
+export default function AdminLeadsRedirectPage() {
+  redirect("/admin/customers?tab=leads");
 }

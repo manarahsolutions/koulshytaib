@@ -17,11 +17,13 @@ import type { Order, OrderStatus } from "@/types/order";
 export type OrderStatusActionsProps = {
   order: Order;
   onError?: (message: string) => void;
+  onUpdated?: (order: Order) => void;
 };
 
 export function OrderStatusActions({
   order,
   onError,
+  onUpdated,
 }: OrderStatusActionsProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -44,12 +46,14 @@ export function OrderStatusActions({
           return;
         }
         saveOrder(result.data);
+        onUpdated?.(result.data);
       } else {
         const result = updateOrderStatus(order.id, status);
         if (!result.ok) {
           onError?.(result.message);
           return;
         }
+        onUpdated?.(result.order);
       }
       setConfirmCancel(false);
     } finally {

@@ -15,6 +15,7 @@ import {
   DELIVERY_FEE_IQD,
 } from "@/features/checkout/pricing";
 import { getProductById } from "@/features/products/product-repository";
+import { configuredUnitPrice } from "@/features/products/product-options";
 import { isProductAvailable } from "@/features/products/selectors";
 import { useCatalogRevision } from "@/features/products/use-catalog";
 import { formatPriceIQD } from "@/lib/format/price";
@@ -72,18 +73,21 @@ export function CartPageClient() {
           {items.map((item) => {
             const product = getProductById(item.productId);
             const available = product ? isProductAvailable(product) : false;
+            const unitPrice = product
+              ? configuredUnitPrice(product.price, item.selections ?? [])
+              : 0;
             return (
               <CartLineRow
-                key={item.productId}
+                key={item.lineKey}
                 productId={item.productId}
                 quantity={item.quantity}
                 notes={item.notes}
+                selections={item.selections}
+                unitPrice={unitPrice}
                 product={product}
                 available={available}
-                onQuantityChange={(next) =>
-                  setQuantity(item.productId, next)
-                }
-                onRemove={() => removeItem(item.productId)}
+                onQuantityChange={(next) => setQuantity(item.lineKey, next)}
+                onRemove={() => removeItem(item.lineKey)}
               />
             );
           })}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isValidInstagramReelUrl,
   normalizeInstagramReelUrl,
+  toInstagramEmbedUrl,
 } from "@/features/reels/instagram-url";
 
 describe("instagram reel url", () => {
@@ -27,5 +28,11 @@ describe("instagram reel url", () => {
         "https://www.instagram.com/reel/AbC123/?igsh=1#x",
       ),
     ).toBe("https://www.instagram.com/reel/AbC123/");
+  });
+
+  it("builds embed url", () => {
+    expect(
+      toInstagramEmbedUrl("https://www.instagram.com/reel/AbC123/?igsh=1"),
+    ).toBe("https://www.instagram.com/reel/AbC123/embed");
   });
 });

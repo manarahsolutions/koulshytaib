@@ -1,5 +1,6 @@
 "use client";
 
+import { GripVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
@@ -7,9 +8,11 @@ import {
   createReelAction,
   deleteReelAction,
   listReelsAction,
-  moveReelAction,
+  reorderReelsAction,
   setReelActiveAction,
 } from "@/app/actions/backend";
+import { ImageSrcField } from "@/components/admin/image-src-field";
+import { useSortableDrag } from "@/components/admin/use-sortable-drag";
 import {
   AdminPageHeader,
   AdminPanel,
@@ -19,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ReelRecord } from "@/features/reels/db-reel-repository";
 import { useProducts } from "@/features/products/use-catalog";
+import { orderedIdsAfterDrop } from "@/lib/reorder/ordered-ids-after-drop";
+import { cn } from "@/lib/utils/cn";
 
 export function AdminReelsClient({
   initial,
@@ -35,6 +40,7 @@ export function AdminReelsClient({
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [productId, setProductId] = useState("");
 
   const refresh = async () => {
@@ -51,6 +57,7 @@ export function AdminReelsClient({
       const result = await createReelAction({
         title,
         instagramUrl: url,
+        thumbnailUrl: thumbnailUrl.trim() || undefined,
         productId: productId || undefined,
       });
       if (!result.ok) {
@@ -59,6 +66,7 @@ export function AdminReelsClient({
       }
       setTitle("");
       setUrl("");
+      setThumbnailUrl("");
       setProductId("");
       await refresh();
     } finally {
@@ -66,11 +74,39 @@ export function AdminReelsClient({
     }
   };
 
+  const onReorderDrop = (sourceId: string, targetId: string) => {
+    const next = orderedIdsAfterDrop(
+      reels.map((r) => r.id),
+      sourceId,
+      targetId,
+    );
+    if (!next) return;
+    // Optimistic UI while saving
+    const byId = new Map(reels.map((r) => [r.id, r]));
+    setReels(next.map((id) => byId.get(id)!).filter(Boolean));
+    void (async () => {
+      setBusy(true);
+      const result = await reorderReelsAction(next);
+      if (!result.ok) {
+        setError(result.message);
+        await refresh();
+      } else {
+        setReels(result.data);
+      }
+      setBusy(false);
+    })();
+  };
+
+  const sortable = useSortableDrag({
+    disabled: busy,
+    onDropReorder: onReorderDrop,
+  });
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
         title="الريلز"
-        description="أضف روابط إنستغرام ريلز — بدون رفع فيديو. الظاهر للزبون هو المفعّل فقط."
+        description="أضف روابط إنستغرام ريلز. اسحب البطاقة لإعادة الترتيب."
       />
 
       <AdminPanel>
@@ -91,6 +127,12 @@ export function AdminReelsClient({
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             required
+          />
+          <ImageSrcField
+            label="صورة مصغّرة (اختياري — تُجلب من إنستغرام تلقائياً)"
+            value={thumbnailUrl}
+            onChange={setThumbnailUrl}
+            inputId={`${formId}-thumb`}
           />
           <Select
             id={`${formId}-product`}
@@ -119,97 +161,93 @@ export function AdminReelsClient({
         <p className="text-sm text-text-muted">ماكو ريلز بعد.</p>
       ) : (
         <ul className="space-y-3">
-          {reels.map((r) => (
-            <li key={r.id}>
-              <AdminPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold text-brand-navy">{r.title}</p>
-                  <Link
-                    href={r.instagramUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="typo-caption break-all text-brand-primary underline-offset-2 hover:underline"
-                    dir="ltr"
-                  >
-                    {r.instagramUrl}
-                  </Link>
-                  <p className="typo-caption mt-1 text-text-muted">
-                    {r.active ? "فعّال" : "معطّل"}
-                    {r.productId ? " · مربوط بمنتج" : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() =>
-                      void (async () => {
-                        setBusy(true);
-                        await moveReelAction(r.id, "up");
-                        await refresh();
-                        setBusy(false);
-                      })()
-                    }
-                  >
-                    أعلى
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() =>
-                      void (async () => {
-                        setBusy(true);
-                        await moveReelAction(r.id, "down");
-                        await refresh();
-                        setBusy(false);
-                      })()
-                    }
-                  >
-                    أسفل
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() =>
-                      void (async () => {
-                        setBusy(true);
-                        await setReelActiveAction(r.id, !r.active);
-                        await refresh();
-                        setBusy(false);
-                      })()
-                    }
-                  >
-                    {r.active ? "تعطيل" : "تفعيل"}
-                  </Button>
-                  {canDelete ? (
+          {reels.map((r) => {
+            const drag = sortable.itemProps(r.id);
+            return (
+              <li key={r.id} {...drag} className={cn(drag.className)}>
+                <AdminPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className="mt-1 inline-flex shrink-0 cursor-grab text-text-muted active:cursor-grabbing"
+                      aria-hidden
+                      title="اسحب لإعادة الترتيب"
+                    >
+                      <GripVertical className="size-4" />
+                    </span>
+                    {r.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={r.thumbnailUrl}
+                        alt=""
+                        className="size-14 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="size-14 shrink-0 rounded-lg bg-surface-warm" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-brand-navy">{r.title}</p>
+                      <Link
+                        href={r.instagramUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="typo-caption break-all text-brand-primary underline-offset-2 hover:underline"
+                        dir="ltr"
+                        onClick={(e) => {
+                          if (sortable.dragId) e.preventDefault();
+                        }}
+                      >
+                        {r.instagramUrl}
+                      </Link>
+                      <p className="typo-caption mt-1 text-text-muted">
+                        {r.active ? "فعّال" : "معطّل"}
+                        {r.productId ? " · مربوط بمنتج" : ""}
+                        {r.thumbnailUrl
+                          ? " · فيه صورة مصغّرة"
+                          : " · بدون صورة مصغّرة"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       size="sm"
-                      variant="destructive"
+                      variant="secondary"
                       disabled={busy}
                       onClick={() =>
                         void (async () => {
-                          if (!confirm("حذف هذا الريل؟")) return;
                           setBusy(true);
-                          await deleteReelAction(r.id);
+                          await setReelActiveAction(r.id, !r.active);
                           await refresh();
                           setBusy(false);
                         })()
                       }
                     >
-                      حذف
+                      {r.active ? "تعطيل" : "تفعيل"}
                     </Button>
-                  ) : null}
-                </div>
-              </AdminPanel>
-            </li>
-          ))}
+                    {canDelete ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={busy}
+                        onClick={() =>
+                          void (async () => {
+                            if (!confirm("حذف هذا الريل؟")) return;
+                            setBusy(true);
+                            await deleteReelAction(r.id);
+                            await refresh();
+                            setBusy(false);
+                          })()
+                        }
+                      >
+                        حذف
+                      </Button>
+                    ) : null}
+                  </div>
+                </AdminPanel>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

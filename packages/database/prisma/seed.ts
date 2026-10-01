@@ -201,9 +201,9 @@ async function main() {
   const seedPassword = process.env.ADMIN_SEED_PASSWORD;
   const seedRoleRaw = process.env.ADMIN_SEED_ROLE?.trim().toUpperCase();
   const seedRole =
-    seedRoleRaw === "MANAGER" || seedRoleRaw === "STAFF"
-      ? seedRoleRaw
-      : "OWNER";
+    seedRoleRaw === "CASHIER" || seedRoleRaw === "STAFF"
+      ? "CASHIER"
+      : "MANAGER";
 
   if (seedId && seedPassword && seedPassword.length >= 8) {
     const bcrypt = await import("bcryptjs");

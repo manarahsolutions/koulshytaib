@@ -42,6 +42,11 @@ import {
   DELIVERY_FEE_IQD,
 } from "@/features/checkout/pricing";
 import {
+  configuredUnitPrice,
+  selectionsToSnapshot,
+} from "@/features/products/product-options";
+import { getProductById } from "@/features/products/product-repository";
+import {
   databaseStatusAction,
   getPublicCheckoutSettingsAction,
   placeGuestOrderAction,
@@ -51,7 +56,6 @@ import {
   placeGuestOrder,
   saveActiveOrder,
 } from "@/features/orders/order-store";
-import { getProductById } from "@/features/products/product-repository";
 import { ICON_STROKE } from "@/lib/ui/icon-stroke";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -139,14 +143,17 @@ export function CheckoutPageClient() {
     return items.flatMap((item) => {
       const product = getProductById(item.productId);
       if (!product) return [];
+      const selections = item.selections ?? [];
+      const unitPrice = configuredUnitPrice(product.price, selections);
       return [
         {
           productId: product.id,
           name: product.name,
-          unitPrice: product.price,
+          unitPrice,
           quantity: item.quantity,
-          lineTotal: product.price * item.quantity,
+          lineTotal: unitPrice * item.quantity,
           notes: item.notes,
+          options: selectionsToSnapshot(selections),
         },
       ];
     });
@@ -268,6 +275,7 @@ export function CheckoutPageClient() {
         productId: item.productId,
         quantity: item.quantity,
         notes: item.notes,
+        optionIds: (item.selections ?? []).map((s) => s.optionId),
       }));
 
       const dbStatus = await databaseStatusAction();

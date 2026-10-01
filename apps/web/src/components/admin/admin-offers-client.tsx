@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   fetchOffersAction,
-  moveOfferAction,
+  reorderOffersAction,
   setOfferActiveAction,
   setOfferFeaturedAction,
   setOfferVisibilityAction,
@@ -20,7 +20,7 @@ import {
   upsertOfferInCache,
 } from "@/features/offers/offer-repository";
 import {
-  moveOffer,
+  reorderOffers,
   setOfferActive,
   setOfferFeatured,
   setOfferVisibility,
@@ -43,6 +43,7 @@ export function AdminOffersClient() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<OfferListFilter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reorderBusy, setReorderBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const allOffers = useOffers();
@@ -68,13 +69,68 @@ export function AdminOffersClient() {
     }
   };
 
+  const onReorder = (orderedIds: string[]) => {
+    void (async () => {
+      setReorderBusy(true);
+      try {
+        const result = await runAdminMutation({
+          db: () => reorderOffersAction(orderedIds),
+          memory: () => reorderOffers(orderedIds),
+          onDbSuccess: async () => {
+            await refreshOffersCache();
+          },
+        });
+        flash(result.ok ? "تم تحديث ترتيب العروض" : result.message);
+      } finally {
+        setReorderBusy(false);
+      }
+    })();
+  };
+
+  const listProps = {
+    offers,
+    allOffers,
+    busyId,
+    reorderBusy,
+    onReorder,
+    onToggleActive: (offer: Offer) =>
+      void withBusy(offer, async () => {
+        const result = await runAdminMutation({
+          db: () => setOfferActiveAction(offer.id, !offer.active),
+          memory: () => setOfferActive(offer.id, !offer.active),
+          onDbSuccess: (next) => upsertOfferInCache(next),
+        });
+        flash(result.ok ? "تم تحديث العرض" : result.message);
+      }),
+    onToggleVisible: (offer: Offer) =>
+      void withBusy(offer, async () => {
+        const result = await runAdminMutation({
+          db: () => setOfferVisibilityAction(offer.id, !offer.visible),
+          memory: () => setOfferVisibility(offer.id, !offer.visible),
+          onDbSuccess: (next) => upsertOfferInCache(next),
+        });
+        flash(result.ok ? "تم تحديث العرض" : result.message);
+      }),
+    onToggleFeatured: (offer: Offer) =>
+      void withBusy(offer, async () => {
+        const result = await runAdminMutation({
+          db: () => setOfferFeaturedAction(offer.id, !offer.featured),
+          memory: () => setOfferFeatured(offer.id, !offer.featured),
+          onDbSuccess: async () => {
+            await refreshOffersCache();
+          },
+        });
+        flash(result.ok ? "تم تحديث العرض" : result.message);
+      }),
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-brand-navy">العروض</h1>
           <p className="mt-1 text-sm text-text-muted">
-            إدارة العروض الظاهرة لزبائن كلشي طيب
+            إدارة العروض الظاهرة لزبائن كلشي طيب — اسحب الصفوف لإعادة الترتيب
           </p>
         </div>
         <Button
@@ -135,102 +191,8 @@ export function AdminOffersClient() {
         />
       ) : (
         <>
-          <OfferTable
-            offers={offers}
-            busyId={busyId}
-            onToggleActive={(offer) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => setOfferActiveAction(offer.id, !offer.active),
-                  memory: () => setOfferActive(offer.id, !offer.active),
-                  onDbSuccess: (next) => upsertOfferInCache(next),
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-            onToggleVisible={(offer) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => setOfferVisibilityAction(offer.id, !offer.visible),
-                  memory: () => setOfferVisibility(offer.id, !offer.visible),
-                  onDbSuccess: (next) => upsertOfferInCache(next),
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-            onToggleFeatured={(offer) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => setOfferFeaturedAction(offer.id, !offer.featured),
-                  memory: () => setOfferFeatured(offer.id, !offer.featured),
-                  onDbSuccess: async () => {
-                    await refreshOffersCache();
-                  },
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-            onMove={(offer, direction) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => moveOfferAction(offer.id, direction),
-                  memory: () => moveOffer(offer.id, direction),
-                  onDbSuccess: async () => {
-                    await refreshOffersCache();
-                  },
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-          />
-          <OfferCards
-            offers={offers}
-            busyId={busyId}
-            onToggleActive={(offer) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => setOfferActiveAction(offer.id, !offer.active),
-                  memory: () => setOfferActive(offer.id, !offer.active),
-                  onDbSuccess: (next) => upsertOfferInCache(next),
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-            onToggleVisible={(offer) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => setOfferVisibilityAction(offer.id, !offer.visible),
-                  memory: () => setOfferVisibility(offer.id, !offer.visible),
-                  onDbSuccess: (next) => upsertOfferInCache(next),
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-            onToggleFeatured={(offer) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => setOfferFeaturedAction(offer.id, !offer.featured),
-                  memory: () => setOfferFeatured(offer.id, !offer.featured),
-                  onDbSuccess: async () => {
-                    await refreshOffersCache();
-                  },
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-            onMove={(offer, direction) =>
-              void withBusy(offer, async () => {
-                const result = await runAdminMutation({
-                  db: () => moveOfferAction(offer.id, direction),
-                  memory: () => moveOffer(offer.id, direction),
-                  onDbSuccess: async () => {
-                    await refreshOffersCache();
-                  },
-                });
-                flash(result.ok ? "تم تحديث العرض" : result.message);
-              })
-            }
-          />
+          <OfferTable {...listProps} />
+          <OfferCards {...listProps} />
         </>
       )}
     </div>

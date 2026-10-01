@@ -7,6 +7,7 @@ import {
   getOfferById,
   listOffers,
   moveOffer as repoMoveOffer,
+  reorderOffers as repoReorderOffers,
   updateOffer as repoUpdateOffer,
 } from "@/features/offers/offer-repository";
 import type {
@@ -86,6 +87,10 @@ export function moveOffer(
   direction: "up" | "down",
 ): OfferResult<Offer> {
   return wrap(() => repoMoveOffer(id, direction));
+}
+
+export function reorderOffers(orderedIds: string[]): OfferResult<Offer[]> {
+  return wrap(() => repoReorderOffers(orderedIds));
 }
 
 export { getOfferById, listOffers };

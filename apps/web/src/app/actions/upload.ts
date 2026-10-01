@@ -17,7 +17,7 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const BLOB_REQUIRED_MESSAGE =
-  "رفع الصور على السيرفر يحتاج إعداد Vercel Blob (BLOB_READ_WRITE_TOKEN).";
+  "رفع الصور على السيرفر يحتاج إعداد Vercel Blob (اربط Blob Store بالمشروع أو عيّن BLOB_READ_WRITE_TOKEN).";
 
 export type UploadImageResult =
   | { ok: true; url: string }
@@ -31,6 +31,23 @@ function extForMime(mime: string): string {
 
 function requiresBlobStorage(): boolean {
   return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+}
+
+/** OIDC (BLOB_STORE_ID) or a static RW token — do not pass token explicitly so OIDC can win. */
+function hasBlobCredentials(): boolean {
+  return Boolean(
+    process.env.BLOB_STORE_ID?.trim() ||
+      process.env.BLOB_READ_WRITE_TOKEN?.trim(),
+  );
+}
+
+function normalizeReadWriteToken(
+  raw: string | undefined,
+): string | undefined {
+  const token = raw?.trim().replace(/^["']|["']$/g, "");
+  if (!token) return undefined;
+  if (!token.startsWith("vercel_blob_rw_")) return undefined;
+  return token;
 }
 
 export async function uploadAdminImageAction(
@@ -56,22 +73,26 @@ export async function uploadAdminImageAction(
     const bytes = Buffer.from(await file.arrayBuffer());
     const filename = `${createOpaqueId("img")}.${extForMime(file.type)}`;
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-    if (token) {
-      if (!token.startsWith("vercel_blob_rw_")) {
+    if (hasBlobCredentials()) {
+      const rw = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+      if (
+        rw &&
+        !process.env.BLOB_STORE_ID?.trim() &&
+        !normalizeReadWriteToken(rw)
+      ) {
         return {
           ok: false,
           message:
-            "قيمة BLOB_READ_WRITE_TOKEN غير صحيحة — لازم تبدأ بـ vercel_blob_rw_ (انسخها من Storage → Blob → .env.local).",
+            "قيمة BLOB_READ_WRITE_TOKEN غير صحيحة — لازم تبدأ بـ vercel_blob_rw_ (انسخها من Storage → Blob).",
         };
       }
       try {
-        // Prefer env token (SDK default); explicit pass only as fallback.
+        // Prefer SDK auth resolution: OIDC + BLOB_STORE_ID on Vercel, else env RW token.
+        // Do not pass `token` — an explicit token always overrides OIDC.
         const blob = await put(`uploads/${filename}`, bytes, {
           access: "public",
           contentType: file.type || undefined,
           addRandomSuffix: true,
-          token,
         });
         return { ok: true, url: blob.url };
       } catch (blobError) {
@@ -84,7 +105,7 @@ export async function uploadAdminImageAction(
           ok: false,
           message: detail
             ? `فشل رفع Blob: ${detail}`
-            : "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من توكن Blob ثم أعد نشر المشروع (Redeploy).",
+            : "ما قدرنا نرفع الصورة على التخزين السحابي. تأكد من ربط Blob Store ثم أعد نشر المشروع (Redeploy).",
         };
       }
     }
@@ -115,10 +136,9 @@ export async function deleteAdminImageAction(
     const trimmed = url.trim();
     if (!trimmed) return { ok: true };
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-    if (token && /^https?:\/\//i.test(trimmed)) {
+    if (hasBlobCredentials() && /^https?:\/\//i.test(trimmed)) {
       try {
-        await del(trimmed, { token });
+        await del(trimmed);
       } catch (error) {
         logServerError("deleteAdminImage.blob", error);
       }

@@ -13,6 +13,7 @@ import {
   dbListProducts,
   dbMoveCategory,
   dbMoveProduct,
+  dbReorderCategories,
   dbReorderProductsInCategory,
   dbUpdateCategory,
   dbUpdateProduct,
@@ -22,6 +23,7 @@ import {
   dbGetOfferById,
   dbListOffers,
   dbMoveOffer,
+  dbReorderOffers,
   dbUpdateOffer,
 } from "@/features/offers/db-offer-repository";
 import {
@@ -59,8 +61,10 @@ import {
 import {
   dbCreateReel,
   dbDeleteReel,
+  dbEnsureReelThumbnails,
   dbListReels,
   dbMoveReel,
+  dbReorderReels,
   dbSetReelActive,
 } from "@/features/reels/db-reel-repository";
 import {
@@ -81,7 +85,7 @@ import {
   dbUpdateAdminRole,
 } from "@/features/admin-auth/db-admin-repository";
 import { hashPassword } from "@/features/admin-auth/password";
-import { OWNER_ONLY, OPERATE_ROLES } from "@/features/admin-auth/permissions";
+import { MANAGER_ONLY, OPERATE_ROLES } from "@/features/admin-auth/permissions";
 import { requireAdminRole } from "@/features/admin-auth/authorization";
 import { dbGetAnalyticsSnapshot } from "@/features/analytics/db-analytics";
 import {
@@ -164,10 +168,16 @@ function requireDb(): void {
   }
 }
 
-/** Admin-only: DB must be up and session must allow operations (STAFF+). */
+/** Admin-only: DB must be up and session must allow floor ops (orders/catalog). */
 async function requireAdminDb(): Promise<void> {
   requireDb();
   await requireAdminRole(OPERATE_ROLES);
+}
+
+/** Manager-only admin areas (offers, CRM, content, analytics, …). */
+async function requireManagerDb(): Promise<void> {
+  requireDb();
+  await requireAdminRole(MANAGER_ONLY);
 }
 
 /* ─── Catalog reads ─────────────────────────────────────────── */
@@ -323,11 +333,24 @@ export async function moveCategoryAction(
   }
 }
 
+export async function reorderCategoriesAction(orderedIds: string[]) {
+  try {
+    await requireAdminDb();
+    const data = await dbReorderCategories(orderedIds);
+    revalidatePath("/admin/products/categories");
+    revalidatePath("/menu");
+    revalidatePath("/");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "reorderCategories");
+  }
+}
+
 /* ─── Offers (Admin mutations) ──────────────────────────────── */
 
 export async function createOfferAction(input: CreateOfferInput) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbCreateOffer(input);
     revalidatePath("/admin/offers");
     revalidatePath("/");
@@ -340,7 +363,7 @@ export async function createOfferAction(input: CreateOfferInput) {
 
 export async function updateOfferAction(id: string, input: UpdateOfferInput) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbUpdateOffer(id, input);
     revalidatePath("/admin/offers");
     revalidatePath(`/admin/offers/${id}`);
@@ -366,7 +389,7 @@ export async function setOfferFeaturedAction(id: string, featured: boolean) {
 
 export async function moveOfferAction(id: string, direction: "up" | "down") {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbMoveOffer(id, direction);
     revalidatePath("/admin/offers");
     return { ok: true as const, data };
@@ -375,9 +398,22 @@ export async function moveOfferAction(id: string, direction: "up" | "down") {
   }
 }
 
+export async function reorderOffersAction(orderedIds: string[]) {
+  try {
+    await requireManagerDb();
+    const data = await dbReorderOffers(orderedIds);
+    revalidatePath("/admin/offers");
+    revalidatePath("/");
+    revalidatePath("/offers");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "reorderOffers");
+  }
+}
+
 export async function getOfferAction(id: string) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbGetOfferById(id);
     if (!data) {
       return { ok: false as const, message: "ما لكينا هذا العرض" };
@@ -401,7 +437,12 @@ export type PlaceOrderActionInput = {
   };
   paymentMethod: PaymentMethodId;
   /** Client cart lines — prices/names ignored; validated against DB */
-  items: Array<{ productId: string; quantity: number; notes?: string }>;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    notes?: string;
+    optionIds?: string[];
+  }>;
   couponCode?: string;
 };
 
@@ -653,7 +694,7 @@ export async function getCustomerStatusWhatsAppLinkAction(
 
 export async function fetchCustomersAction(query?: string) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = query?.trim()
       ? await dbSearchCustomers(query)
       : await dbListCustomers();
@@ -666,7 +707,7 @@ export async function fetchCustomersAction(query?: string) {
 /** Admin CRM + loyalty bootstrap for client cache hydrate. */
 export async function fetchCrmBootstrapAction() {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const [customers, accounts, transactions, config] = await Promise.all([
       dbListCustomers(),
       dbListLoyaltyAccounts(),
@@ -684,7 +725,7 @@ export async function fetchCrmBootstrapAction() {
 
 export async function fetchCustomerDetailAction(id: string) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const customer = await dbFindCustomerById(id);
     if (!customer) {
       return { ok: false as const, message: "ما لكينا هذا الزبون" };
@@ -707,7 +748,7 @@ export async function updateCustomerAction(
   input: { name?: string; status?: "active" | "inactive" },
 ) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbUpdateCustomer(id, input);
     revalidatePath("/admin/customers");
     revalidatePath(`/admin/customers/${id}`);
@@ -723,7 +764,7 @@ export async function adjustLoyaltyPointsAction(
   reason: string,
 ) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const config = await dbGetLoyaltyConfig();
     if (!config.enabled) {
       return { ok: false as const, message: "نظام الولاء غير مفعّل حالياً" };
@@ -749,11 +790,57 @@ export async function adjustLoyaltyPointsAction(
   }
 }
 
+export async function redeemLoyaltyPointsAction(
+  customerId: string,
+  points: number,
+  reason: string,
+) {
+  try {
+    await requireManagerDb();
+    const config = await dbGetLoyaltyConfig();
+    if (!config.enabled) {
+      return { ok: false as const, message: "نظام الولاء غير مفعّل حالياً" };
+    }
+    if (!config.redemption.enabled) {
+      return { ok: false as const, message: "استبدال النقاط غير مفعّل" };
+    }
+    if (!Number.isInteger(points) || points <= 0) {
+      return { ok: false as const, message: "اكتب عدداً صحيحاً أكبر من صفر" };
+    }
+    if (points < config.redemption.minimumPoints) {
+      return {
+        ok: false as const,
+        message: `الحد الأدنى للاستبدال ${config.redemption.minimumPoints} نقطة`,
+      };
+    }
+    if (!reason.trim()) {
+      return { ok: false as const, message: "اكتب سبب الخصم" };
+    }
+    const account = await dbGetLoyaltyAccount(customerId);
+    const balance = account?.pointsBalance ?? 0;
+    if (points > balance) {
+      return { ok: false as const, message: "الرصيد ما يكفي" };
+    }
+    const data = await dbAppendLoyaltyTransaction({
+      customerId,
+      type: "redeem",
+      points,
+      reason: reason.trim(),
+      source: { type: "manual" },
+    });
+    revalidatePath("/admin/loyalty");
+    revalidatePath(`/admin/loyalty/customers/${customerId}`);
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "redeemLoyaltyPoints");
+  }
+}
+
 export async function setLoyaltyConfigAction(
   patch: Partial<LoyaltyConfig>,
 ): Promise<ActionResult<LoyaltyConfig>> {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const current = await dbGetLoyaltyConfig();
     const next: LoyaltyConfig = {
       ...current,
@@ -772,7 +859,7 @@ export async function setLoyaltyConfigAction(
 
 export async function listCouponsAction() {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     return { ok: true as const, data: await dbListCoupons() };
   } catch (error) {
     return fail(error, "listCoupons");
@@ -787,7 +874,7 @@ export async function createCouponAction(input: {
   expiresAt?: string;
 }) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbCreateCoupon(input);
     revalidatePath("/admin/coupons");
     return { ok: true as const, data };
@@ -798,7 +885,7 @@ export async function createCouponAction(input: {
 
 export async function setCouponActiveAction(id: string, active: boolean) {
   try {
-    await requireAdminDb();
+    await requireManagerDb();
     const data = await dbSetCouponActive(id, active);
     revalidatePath("/admin/coupons");
     return { ok: true as const, data };
@@ -819,7 +906,7 @@ export async function validateCouponAction(code: string, subtotal: number) {
 
 export async function fetchAnalyticsAction(range?: AnalyticsRangeInput) {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     if (range) {
       return { ok: true as const, data: await dbGetExtendedAnalytics(range) };
     }
@@ -831,7 +918,7 @@ export async function fetchAnalyticsAction(range?: AnalyticsRangeInput) {
 
 export async function fetchLeadsAction(filter?: LeadsFilter) {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     return { ok: true as const, data: await dbListLeads(filter ?? {}) };
   } catch (error) {
     return fail(error, "fetchLeads");
@@ -840,7 +927,8 @@ export async function fetchLeadsAction(filter?: LeadsFilter) {
 
 export async function listReelsAction() {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
+    await dbEnsureReelThumbnails();
     return { ok: true as const, data: await dbListReels() };
   } catch (error) {
     return fail(error, "listReels");
@@ -854,7 +942,7 @@ export async function createReelAction(input: {
   productId?: string;
 }) {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     const data = await dbCreateReel(input);
     revalidatePath("/admin/reels");
     revalidatePath("/");
@@ -866,7 +954,7 @@ export async function createReelAction(input: {
 
 export async function setReelActiveAction(id: string, active: boolean) {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     const data = await dbSetReelActive(id, active);
     revalidatePath("/admin/reels");
     revalidatePath("/");
@@ -878,7 +966,7 @@ export async function setReelActiveAction(id: string, active: boolean) {
 
 export async function moveReelAction(id: string, direction: "up" | "down") {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     const data = await dbMoveReel(id, direction);
     revalidatePath("/admin/reels");
     revalidatePath("/");
@@ -888,9 +976,21 @@ export async function moveReelAction(id: string, direction: "up" | "down") {
   }
 }
 
+export async function reorderReelsAction(orderedIds: string[]) {
+  try {
+    await requireAdminRole(MANAGER_ONLY);
+    const data = await dbReorderReels(orderedIds);
+    revalidatePath("/admin/reels");
+    revalidatePath("/");
+    return { ok: true as const, data };
+  } catch (error) {
+    return fail(error, "reorderReels");
+  }
+}
+
 export async function deleteReelAction(id: string) {
   try {
-    await requireAdminRole(OWNER_ONLY);
+    await requireAdminRole(MANAGER_ONLY);
     await dbDeleteReel(id);
     revalidatePath("/admin/reels");
     revalidatePath("/");
@@ -910,7 +1010,7 @@ export async function fetchActiveReelsAction() {
   }
 }
 
-/* ─── Settings + admins (OWNER) ─────────────────────────────── */
+/* ─── Settings + admins (MANAGER) ───────────────────────────── */
 
 export async function getPublicCheckoutSettingsAction() {
   try {
@@ -931,7 +1031,7 @@ export async function getPublicCheckoutSettingsAction() {
 
 export async function getRestaurantSettingsAction() {
   try {
-    await requireAdminRole(OWNER_ONLY);
+    await requireAdminRole(MANAGER_ONLY);
     return { ok: true as const, data: await dbGetRestaurantSettings() };
   } catch (error) {
     return fail(error, "getRestaurantSettings");
@@ -942,7 +1042,7 @@ export async function updateRestaurantSettingsAction(
   patch: Partial<RestaurantSettings>,
 ) {
   try {
-    await requireAdminRole(OWNER_ONLY);
+    await requireAdminRole(MANAGER_ONLY);
     const data = await dbUpsertRestaurantSettings(patch);
     revalidatePath("/admin/settings");
     revalidatePath("/cart");
@@ -955,7 +1055,7 @@ export async function updateRestaurantSettingsAction(
 
 export async function listAdminsAction() {
   try {
-    await requireAdminRole(OWNER_ONLY);
+    await requireAdminRole(MANAGER_ONLY);
     return { ok: true as const, data: await dbListAdmins() };
   } catch (error) {
     return fail(error, "listAdmins");
@@ -968,7 +1068,7 @@ export async function createAdminAccountAction(input: {
   role: AdminRole;
 }) {
   try {
-    await requireAdminRole(OWNER_ONLY);
+    await requireAdminRole(MANAGER_ONLY);
     const identifier = input.identifier.trim();
     if (!identifier) {
       return { ok: false as const, message: "اكتب معرف الدخول" };
@@ -976,7 +1076,7 @@ export async function createAdminAccountAction(input: {
     if (input.password.length < 8) {
       return { ok: false as const, message: "كلمة المرور لازم 8 أحرف على الأقل" };
     }
-    if (!["OWNER", "MANAGER", "STAFF"].includes(input.role)) {
+    if (!["MANAGER", "CASHIER"].includes(input.role)) {
       return { ok: false as const, message: "دور غير صالح" };
     }
     const passwordHash = await hashPassword(input.password);
@@ -994,7 +1094,7 @@ export async function createAdminAccountAction(input: {
 
 export async function setAdminActiveAction(id: string, isActive: boolean) {
   try {
-    const actor = await requireAdminRole(OWNER_ONLY);
+    const actor = await requireAdminRole(MANAGER_ONLY);
     if (actor.adminId === id && !isActive) {
       return { ok: false as const, message: "ما تكدر تعطّل حسابك الحالي" };
     }
@@ -1008,11 +1108,11 @@ export async function setAdminActiveAction(id: string, isActive: boolean) {
 
 export async function updateAdminRoleAction(id: string, role: AdminRole) {
   try {
-    const actor = await requireAdminRole(OWNER_ONLY);
-    if (actor.adminId === id && role !== "OWNER") {
+    const actor = await requireAdminRole(MANAGER_ONLY);
+    if (actor.adminId === id && role !== "MANAGER") {
       return {
         ok: false as const,
-        message: "ما تكدر تخفّض دور حسابك الحالي عن مالك",
+        message: "ما تكدر تخفّض دور حسابك الحالي عن مدير",
       };
     }
     const data = await dbUpdateAdminRole(id, role);
@@ -1027,7 +1127,7 @@ export async function updateAdminRoleAction(id: string, role: AdminRole) {
 
 export async function listLoyaltyRewardsAction() {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     return {
       ok: true as const,
       data: await dbListLoyaltyRewards(),
@@ -1044,7 +1144,7 @@ export async function createLoyaltyRewardAction(input: {
   active?: boolean;
 }) {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     const data = await dbCreateLoyaltyReward(input);
     revalidatePath("/admin/loyalty");
     return { ok: true as const, data };
@@ -1063,7 +1163,7 @@ export async function updateLoyaltyRewardAction(
   }>,
 ) {
   try {
-    await requireAdminRole(OPERATE_ROLES);
+    await requireAdminRole(MANAGER_ONLY);
     const data = await dbUpdateLoyaltyReward(id, patch);
     revalidatePath("/admin/loyalty");
     return { ok: true as const, data };
@@ -1074,7 +1174,7 @@ export async function updateLoyaltyRewardAction(
 
 export async function deleteLoyaltyRewardAction(id: string) {
   try {
-    await requireAdminRole(OWNER_ONLY);
+    await requireAdminRole(MANAGER_ONLY);
     await dbDeleteLoyaltyReward(id);
     revalidatePath("/admin/loyalty");
     return { ok: true as const, data: true };

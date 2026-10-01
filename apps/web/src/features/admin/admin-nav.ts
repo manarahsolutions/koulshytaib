@@ -2,10 +2,14 @@
  * Admin navigation groups — single source for shell + section titles.
  */
 
+import type { AdminRole } from "@/features/admin-auth/types";
+
 export type AdminNavItem = {
   href: string;
   label: string;
   match: (pathname: string) => boolean;
+  /** Who can see this item. Defaults to both roles. */
+  roles?: readonly AdminRole[];
 };
 
 export type AdminNavGroup = {
@@ -23,6 +27,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin",
         label: "لوحة التحكم",
         match: (p) => p === "/admin",
+        roles: ["MANAGER"],
       },
     ],
   },
@@ -57,11 +62,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/offers",
         label: "العروض",
         match: (p) => p.startsWith("/admin/offers"),
+        roles: ["MANAGER"],
       },
       {
         href: "/admin/coupons",
         label: "الكوبونات",
         match: (p) => p.startsWith("/admin/coupons"),
+        roles: ["MANAGER"],
       },
     ],
   },
@@ -72,19 +79,14 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       {
         href: "/admin/customers",
         label: "قائمة الزبائن",
-        match: (p) =>
-          p.startsWith("/admin/customers") &&
-          !p.startsWith("/admin/customers/leads"),
+        match: (p) => p.startsWith("/admin/customers"),
+        roles: ["MANAGER"],
       },
       {
         href: "/admin/loyalty",
         label: "الولاء",
         match: (p) => p.startsWith("/admin/loyalty"),
-      },
-      {
-        href: "/admin/customers/leads",
-        label: "Leads",
-        match: (p) => p.startsWith("/admin/customers/leads"),
+        roles: ["MANAGER"],
       },
     ],
   },
@@ -96,6 +98,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/reels",
         label: "الريلز",
         match: (p) => p.startsWith("/admin/reels"),
+        roles: ["MANAGER"],
       },
     ],
   },
@@ -107,15 +110,32 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/analytics",
         label: "التحليلات",
         match: (p) => p.startsWith("/admin/analytics"),
+        roles: ["MANAGER"],
       },
       {
         href: "/admin/settings",
         label: "الإعدادات",
         match: (p) => p.startsWith("/admin/settings"),
+        roles: ["MANAGER"],
       },
     ],
   },
 ];
+
+export function navItemVisibleToRole(
+  item: AdminNavItem,
+  role: AdminRole,
+): boolean {
+  const allowed = item.roles ?? (["MANAGER", "CASHIER"] as const);
+  return allowed.includes(role);
+}
+
+export function filterAdminNavForRole(role: AdminRole): AdminNavGroup[] {
+  return ADMIN_NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => navItemVisibleToRole(item, role)),
+  })).filter((group) => group.items.length > 0);
+}
 
 export function getAdminSectionLabel(pathname: string): string {
   for (const group of ADMIN_NAV_GROUPS) {

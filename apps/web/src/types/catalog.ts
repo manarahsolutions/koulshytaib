@@ -32,6 +32,52 @@ export type Category = {
   updatedAt: string;
 };
 
+export type OptionSelection = "SINGLE" | "MULTI";
+
+export type ProductOption = {
+  id: string;
+  groupId: string;
+  name: string;
+  /** Integer IQD delta vs base product price */
+  priceDelta: number;
+  available: boolean;
+  sortOrder: number;
+};
+
+export type ProductOptionGroup = {
+  id: string;
+  productId: string;
+  name: string;
+  selection: OptionSelection;
+  required: boolean;
+  minSelect?: number;
+  maxSelect?: number;
+  sortOrder: number;
+  options: ProductOption[];
+};
+
+/** Admin form draft (ids optional until persisted). */
+export type ProductOptionDraft = {
+  clientKey: string;
+  id?: string;
+  name: string;
+  priceDelta: number;
+  available: boolean;
+  sortOrder: number;
+};
+
+export type ProductOptionGroupDraft = {
+  clientKey: string;
+  id?: string;
+  name: string;
+  selection: OptionSelection;
+  required: boolean;
+  minSelect?: number;
+  maxSelect?: number;
+  sortOrder: number;
+  options: ProductOptionDraft[];
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -49,6 +95,7 @@ export type Product = {
   /** Should it appear in the customer menu? */
   visible: boolean;
   sortOrder: number;
+  optionGroups?: ProductOptionGroup[];
   createdAt: string;
   updatedAt: string;
 };
@@ -64,6 +111,7 @@ export type CreateProductInput = {
   imageAlt?: string;
   oldPrice?: number;
   sortOrder?: number;
+  optionGroups?: ProductOptionGroupDraft[];
 };
 
 export type UpdateProductInput = Partial<

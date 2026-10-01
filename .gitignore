@@ -50,3 +50,8 @@ next-env.d.ts
 # Local admin image uploads (dev filesystem)
 apps/web/public/uploads/*
 !apps/web/public/uploads/.gitkeep
+
+.vercel
+.env*
+
+apps/web/assets/*.pdf

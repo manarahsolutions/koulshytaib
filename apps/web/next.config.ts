@@ -6,7 +6,22 @@ import path from "path";
 loadEnvConfig(path.resolve(__dirname, "../.."));
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.cdninstagram.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.fbcdn.net",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

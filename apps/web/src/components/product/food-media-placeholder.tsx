@@ -13,8 +13,7 @@ export type FoodMediaPlaceholderProps = {
 };
 
 /**
- * Editorial media stand-in until real photography / reels exist.
- * Not a fake food photo — warmer cream + motif, clearly “لاحقاً”.
+ * Editorial media stand-in when a photo/thumbnail is not set yet.
  */
 export function FoodMediaPlaceholder({
   className,
@@ -25,10 +24,10 @@ export function FoodMediaPlaceholder({
   const resolvedLabel =
     label ??
     (intent === "reel"
-      ? "لقطة من المطبخ — لاحقاً"
+      ? "لقطة من المطبخ"
       : intent === "hero"
-        ? "إطار الطبق المميز — لاحقاً"
-        : "مكان صورة الطبق — لاحقاً");
+        ? "صورة الطبق المميز"
+        : "صورة الطبق");
 
   return (
     <div

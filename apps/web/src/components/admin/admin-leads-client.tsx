@@ -11,7 +11,14 @@ import type { LeadRow } from "@/features/analytics/db-analytics-extended";
 import { downloadCsv, toCsv } from "@/lib/csv/download-csv";
 import { formatPriceIQD } from "@/lib/format/price";
 
-export function AdminLeadsClient({ initial }: { initial: LeadRow[] }) {
+export function AdminLeadsClient({
+  initial,
+  embedded = false,
+}: {
+  initial: LeadRow[];
+  /** When true, omit the standalone page header (used inside الزبائن tabs). */
+  embedded?: boolean;
+}) {
   const [rows, setRows] = useState(initial);
   const [kind, setKind] = useState<"all" | "inactive" | "vip" | "new_week">(
     "all",
@@ -26,35 +33,46 @@ export function AdminLeadsClient({ initial }: { initial: LeadRow[] }) {
     setBusy(false);
   };
 
+  const exportButton = (
+    <Button
+      type="button"
+      size="sm"
+      variant="secondary"
+      onClick={() =>
+        downloadCsv(
+          "leads.csv",
+          toCsv(
+            rows.map((r) => ({
+              name: r.name,
+              phone: r.phone,
+              orders: r.orderCount,
+              lastOrderAt: r.lastOrderAt ?? "",
+              spendIqd: r.spendIqd,
+            })),
+          ),
+        )
+      }
+    >
+      تصدير CSV
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Leads"
-        description="اسم ورقم واتساب وملخص الطلبات — للتصدير والمتابعة التسويقية."
-        actions={
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() =>
-              downloadCsv(
-                "leads.csv",
-                toCsv(
-                  rows.map((r) => ({
-                    name: r.name,
-                    phone: r.phone,
-                    orders: r.orderCount,
-                    lastOrderAt: r.lastOrderAt ?? "",
-                    spendIqd: r.spendIqd,
-                  })),
-                ),
-              )
-            }
-          >
-            تصدير CSV
-          </Button>
-        }
-      />
+      {embedded ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <p className="text-sm text-text-muted">
+            اسم ورقم واتساب وملخص الطلبات — للتصدير والمتابعة التسويقية.
+          </p>
+          {exportButton}
+        </div>
+      ) : (
+        <AdminPageHeader
+          title="المتابعة"
+          description="اسم ورقم واتساب وملخص الطلبات — للتصدير والمتابعة التسويقية."
+          actions={exportButton}
+        />
+      )}
 
       <div className="flex flex-wrap gap-2">
         {(

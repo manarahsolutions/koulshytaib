@@ -11,7 +11,7 @@ export type ReelsSectionProps = {
 };
 
 /**
- * Social beat: horizontal portrait cards (demo media only).
+ * Kitchen reels rail — real Instagram clips from Admin.
  */
 export function ReelsSection({ reels, className }: ReelsSectionProps) {
   if (reels.length === 0) return null;
@@ -33,7 +33,7 @@ export function ReelsSection({ reels, className }: ReelsSectionProps) {
             من مطبخنا
           </h2>
           <p className="typo-caption mt-1 text-text-muted">
-            لقطات تجريبية للتصميم — بدون أرقام تفاعل أو روابط إنستغرام وهمية
+            لقطات قصيرة من التحضير والطبخ — اضغط للمشاهدة داخل الموقع
           </p>
         </div>
       </PageContainer>

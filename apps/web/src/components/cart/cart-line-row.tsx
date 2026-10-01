@@ -6,6 +6,10 @@ import Link from "next/link";
 import { FoodMediaPlaceholder } from "@/components/product/food-media-placeholder";
 import { Price } from "@/components/ui/price";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
+import {
+  formatSelectionsSummary,
+  type SelectedOption,
+} from "@/features/products/product-options";
 import { formatPriceIQD } from "@/lib/format/price";
 import { ICON_STROKE } from "@/lib/ui/icon-stroke";
 import { cn } from "@/lib/utils/cn";
@@ -15,6 +19,8 @@ export type CartLineRowProps = {
   productId: string;
   quantity: number;
   notes?: string;
+  selections?: SelectedOption[];
+  unitPrice: number;
   product: Product | undefined;
   available: boolean;
   onQuantityChange: (next: number) => void;
@@ -26,6 +32,8 @@ export function CartLineRow({
   productId,
   quantity,
   notes,
+  selections = [],
+  unitPrice,
   product,
   available,
   onQuantityChange,
@@ -33,8 +41,9 @@ export function CartLineRow({
   className,
 }: CartLineRowProps) {
   const name = product?.name ?? "منتج غير متاح";
-  const lineTotal = product ? product.price * quantity : 0;
+  const lineTotal = unitPrice * quantity;
   const hasImage = Boolean(product?.imageSrc);
+  const optionsSummary = formatSelectionsSummary(selections);
 
   return (
     <li
@@ -73,10 +82,11 @@ export function CartLineRow({
             ) : (
               <p className="text-sm font-semibold text-text">{name}</p>
             )}
-            {product ? (
-              <div className="mt-0.5">
-                <Price amount={product.price} size="sm" />
-              </div>
+            <div className="mt-0.5">
+              <Price amount={unitPrice} size="sm" />
+            </div>
+            {optionsSummary ? (
+              <p className="typo-caption mt-1 text-text-muted">{optionsSummary}</p>
             ) : null}
           </div>
           <p className="shrink-0 text-sm font-semibold tabular-nums text-brand-primary">

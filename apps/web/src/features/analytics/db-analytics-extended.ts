@@ -28,13 +28,36 @@ export type ExtendedAnalytics = AnalyticsSnapshot & {
 
 const WEEKDAY_AR = ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
 
+/** Baghdad has no DST — fixed UTC+3. */
+function iraqDayStart(ymd: string): Date {
+  return new Date(`${ymd}T00:00:00+03:00`);
+}
+
+function iraqDayEnd(ymd: string): Date {
+  return new Date(`${ymd}T23:59:59.999+03:00`);
+}
+
+function isYmd(value: string | undefined): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
 function resolveRange(input: AnalyticsRangeInput): { from: Date; to: Date } {
-  const to = input.to ? new Date(input.to) : new Date();
+  if (input.preset === "custom" && isYmd(input.from) && isYmd(input.to)) {
+    let from = iraqDayStart(input.from);
+    let to = iraqDayEnd(input.to);
+    if (from.getTime() > to.getTime()) {
+      const swapFrom = input.to;
+      const swapTo = input.from;
+      from = iraqDayStart(swapFrom);
+      to = iraqDayEnd(swapTo);
+    }
+    return { from, to };
+  }
+
+  const to = new Date();
   to.setHours(23, 59, 59, 999);
   let from: Date;
-  if (input.preset === "custom" && input.from) {
-    from = new Date(input.from);
-  } else if (input.preset === "day") {
+  if (input.preset === "day") {
     from = new Date(to);
     from.setHours(0, 0, 0, 0);
   } else if (input.preset === "month") {

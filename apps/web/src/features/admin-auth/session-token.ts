@@ -6,7 +6,7 @@
 export type SessionTokenPayload = {
   sub: string;
   identifier: string;
-  role: "OWNER" | "MANAGER" | "STAFF";
+  role: "MANAGER" | "CASHIER";
   iat: number;
   exp: number;
 };
@@ -117,7 +117,7 @@ export async function verifySessionToken(
       return null;
     }
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
-    if (!["OWNER", "MANAGER", "STAFF"].includes(payload.role)) return null;
+    if (!["MANAGER", "CASHIER"].includes(payload.role)) return null;
     return payload;
   } catch {
     return null;

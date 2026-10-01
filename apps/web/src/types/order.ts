@@ -43,6 +43,12 @@ export type OrderLineSnapshot = {
   quantity: number;
   lineTotal: number;
   notes?: string;
+  /** Immutable option snapshot at checkout */
+  options?: Array<{
+    groupName: string;
+    optionName: string;
+    priceDelta: number;
+  }>;
 };
 
 /**

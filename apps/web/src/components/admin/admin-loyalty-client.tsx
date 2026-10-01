@@ -7,8 +7,12 @@ import {
   LoyaltyCustomerCards,
   LoyaltyCustomerTable,
 } from "@/components/admin/loyalty-customer-list";
-import { LoyaltyEnableToggle } from "@/components/admin/loyalty-enable-toggle";
+import { LoyaltySettingsForm } from "@/components/admin/loyalty-settings-form";
 import { StatCard } from "@/components/admin/stat-card";
+import {
+  AdminPageHeader,
+  AdminPanel,
+} from "@/components/admin/ui/admin-page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getLoyaltyConfig } from "@/features/loyalty/loyalty-service";
 import { getLoyaltyOverviewMetrics } from "@/features/loyalty/selectors";
@@ -32,23 +36,44 @@ export function AdminLoyaltyClient() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-brand-navy">الولاء</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          إدارة نقاط الولاء وحركة أرصدة الزبائن
-        </p>
-      </header>
+      <AdminPageHeader
+        title="الولاء"
+        description="نظام نقاط للزبائن الدائمين — واضح للطاقم: اكتساب عند التسليم، تواصل واتساب، وخصم يدوي بعد الاتفاق."
+      />
 
-      <section
-        className="rounded-lg border border-border bg-surface-elevated p-4"
-        aria-labelledby="loyalty-status-heading"
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <h2
-            id="loyalty-status-heading"
-            className="text-base font-semibold text-brand-navy"
-          >
-            حالة النظام
+      <AdminPanel>
+        <h2 className="text-base font-semibold text-brand-navy">
+          كيف يشتغل النظام؟
+        </h2>
+        <ol className="mt-3 list-decimal space-y-2 pe-5 text-sm leading-relaxed text-text-muted">
+          <li>
+            <span className="font-medium text-text">فعّل الولاء</span> واضبط
+            معدل الاكتساب (نقاط لكل دينار من إجمالي الطلب المكتمل).
+          </li>
+          <li>
+            عند تحويل الطلب إلى{" "}
+            <span className="font-medium text-text">مكتمل (delivered)</span>{" "}
+            تُضاف النقاط تلقائياً إذا كان الاكتساب مفعّلاً والمعدل أكبر من صفر.
+          </li>
+          <li>
+            من ملف الزبون في الولاء: شوف الرصيد،{" "}
+            <span className="font-medium text-text">راسله واتساب</span>، واقترح
+            خصم/مكافأة، ثم{" "}
+            <span className="font-medium text-text">خصم النقاط</span> أو عدّل
+            الرصيد يدوياً مع سبب واضح.
+          </li>
+          <li>
+            الزبون{" "}
+            <span className="font-medium text-text">ما يستبدل لوحده</span> من
+            الموقع حالياً — كل الاستبدال عبر الطاقم.
+          </li>
+        </ol>
+      </AdminPanel>
+
+      <AdminPanel>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <h2 className="text-base font-semibold text-brand-navy">
+            الإعدادات
           </h2>
           <span
             className={
@@ -59,76 +84,43 @@ export function AdminLoyaltyClient() {
           >
             {config.enabled ? "مفعّل" : "غير مفعّل"}
           </span>
-          <LoyaltyEnableToggle
-            enabled={config.enabled}
-            onChanged={() => setUiTick((t) => t + 1)}
-          />
         </div>
-        {!config.enabled ? (
-          <p className="mt-2 text-sm text-text-muted" role="status">
-            نظام الولاء غير مفعّل حالياً، لذلك لا يمكن كسب أو استبدال النقاط.
-          </p>
-        ) : null}
-
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <dt className="typo-caption text-text-subtle">اكتساب النقاط</dt>
-            <dd>
-              {config.earning.enabled ? "مفعّل" : "غير مفعّل"}
-              <span className="mt-0.5 block text-text-muted">
-                النقاط لكل دينار: {config.earning.pointsPerCurrencyUnit}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="typo-caption text-text-subtle">استبدال النقاط</dt>
-            <dd>
-              {config.redemption.enabled ? "مفعّل" : "غير متاح حالياً"}
-              <span className="mt-0.5 block text-text-muted">
-                الحد الأدنى: {config.redemption.minimumPoints} · معدل التحويل:{" "}
-                {config.redemption.pointsPerCurrencyUnit}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="typo-caption text-text-subtle">اكتساب تلقائي</dt>
-            <dd className="text-text-muted">
-              {config.earning.enabled
-                ? "حسب إعدادات الكسب"
-                : "اكتساب النقاط غير مفعّل حالياً"}
-            </dd>
-          </div>
-        </dl>
-      </section>
+        <LoyaltySettingsForm onSaved={() => setUiTick((t) => t + 1)} />
+      </AdminPanel>
 
       <section aria-label="مؤشرات الولاء">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            label="عدد حسابات الولاء"
+            label="حسابات الولاء"
             value={String(overview.accountCount)}
           />
           <StatCard
-            label="إجمالي أرصدة النقاط"
+            label="إجمالي الأرصدة"
             value={formatPoints(overview.totalBalance)}
           />
           <StatCard
-            label="إجمالي النقاط المكتسبة"
+            label="مكتسبة (عمر الحسابات)"
             value={formatPoints(overview.totalEarned)}
           />
           <StatCard
-            label="إجمالي النقاط المستبدلة"
+            label="مستبدلة"
             value={formatPoints(overview.totalRedeemed)}
           />
         </div>
       </section>
 
       <section className="space-y-4" aria-labelledby="loyalty-customers-heading">
-        <h2
-          id="loyalty-customers-heading"
-          className="text-lg font-semibold text-brand-navy"
-        >
-          زبائن الولاء
-        </h2>
+        <div>
+          <h2
+            id="loyalty-customers-heading"
+            className="text-lg font-semibold text-brand-navy"
+          >
+            زبائن الولاء
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            ابحث بالاسم أو الهاتف، افتح الملف للتعديل أو واتساب أو خصم النقاط.
+          </p>
+        </div>
 
         <LoyaltyCustomerSearch
           query={query}
@@ -141,7 +133,7 @@ export function AdminLoyaltyClient() {
           <EmptyState
             icon={<Users />}
             title="ماكو زبائن حالياً"
-            description="بعد إنشاء زبائن من الطلبات، تظهر هنا."
+            description="بعد أول طلبات، يظهر الزبائن هنا مع حساب ولاء."
           />
         ) : items.length === 0 ? (
           <EmptyState
@@ -158,16 +150,13 @@ export function AdminLoyaltyClient() {
               </button>
             }
           />
-        ) : overview.accountCount === 0 ? (
-          <>
-            <p className="text-sm text-text-muted" role="status">
-              ماكو حسابات ولاء حالياً — الزبائن أدناه بدون حساب ولاء بعد.
-            </p>
-            <LoyaltyCustomerTable items={items} />
-            <LoyaltyCustomerCards items={items} />
-          </>
         ) : (
           <>
+            {overview.accountCount === 0 ? (
+              <p className="text-sm text-text-muted" role="status">
+                ماكو حسابات ولاء بعد — الحساب ينشأ مع طلب الزبون.
+              </p>
+            ) : null}
             <LoyaltyCustomerTable items={items} />
             <LoyaltyCustomerCards items={items} />
           </>

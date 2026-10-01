@@ -294,10 +294,31 @@ export function moveOffer(id: string, direction: "up" | "down"): Offer {
   return getOfferById(id)!;
 }
 
+export function reorderOffers(orderedIds: string[]): Offer[] {
+  ensureOffersSeeded();
+  const current = listOffers();
+  const currentIds = new Set(current.map((o) => o.id));
+  if (
+    orderedIds.length !== current.length ||
+    orderedIds.some((id) => !currentIds.has(id))
+  ) {
+    throw new Error("OFFER_REORDER_INVALID");
+  }
+  const now = new Date().toISOString();
+  orderedIds.forEach((id, index) => {
+    const existing = byId.get(id);
+    if (!existing) return;
+    byId.set(id, { ...existing, sortOrder: index + 1, updatedAt: now });
+  });
+  emit();
+  return listOffers();
+}
+
 export const offerRepository = {
   list: listOffers,
   getById: getOfferById,
   create: createOffer,
   update: updateOffer,
   move: moveOffer,
+  reorder: reorderOffers,
 };

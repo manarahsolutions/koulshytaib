@@ -54,7 +54,7 @@ export function AdminSettingsClient({
 
   const [newId, setNewId] = useState("");
   const [newPass, setNewPass] = useState("");
-  const [newRole, setNewRole] = useState<AdminRole>("STAFF");
+  const [newRole, setNewRole] = useState<AdminRole>("CASHIER");
 
   const saveSettings = async (e: FormEvent) => {
     e.preventDefault();
@@ -102,7 +102,7 @@ export function AdminSettingsClient({
       }
       setNewId("");
       setNewPass("");
-      setNewRole("STAFF");
+      setNewRole("CASHIER");
       await refreshAdmins();
       setOkMsg("تم إنشاء حساب الأدمن");
     } finally {
@@ -114,7 +114,7 @@ export function AdminSettingsClient({
     <div className="space-y-8">
       <AdminPageHeader
         title="الإعدادات"
-        description="معلومات المطعم، رسوم التوصيل، وساعات العمل — للمالك فقط."
+        description="معلومات المطعم، رسوم التوصيل، وساعات العمل — للمدير فقط."
       />
 
       {error ? (
@@ -237,9 +237,8 @@ export function AdminSettingsClient({
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as AdminRole)}
             >
-              <option value="STAFF">موظف</option>
-              <option value="MANAGER">مدير تشغيل</option>
-              <option value="OWNER">مالك</option>
+              <option value="CASHIER">{ADMIN_ROLE_LABELS.CASHIER}</option>
+              <option value="MANAGER">{ADMIN_ROLE_LABELS.MANAGER}</option>
             </Select>
           </Field>
           <Button type="submit" loading={busy} variant="secondary">
@@ -280,11 +279,12 @@ export function AdminSettingsClient({
                         })();
                       }}
                     >
-                      <option value="STAFF">{ADMIN_ROLE_LABELS.STAFF}</option>
+                      <option value="CASHIER">
+                        {ADMIN_ROLE_LABELS.CASHIER}
+                      </option>
                       <option value="MANAGER">
                         {ADMIN_ROLE_LABELS.MANAGER}
                       </option>
-                      <option value="OWNER">{ADMIN_ROLE_LABELS.OWNER}</option>
                     </select>
                   </td>
                   <td className="px-2 py-2">

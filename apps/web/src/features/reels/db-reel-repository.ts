@@ -10,6 +10,7 @@ import { createOpaqueId } from "@/lib/id";
 import {
   normalizeInstagramReelUrl,
 } from "@/features/reels/instagram-url";
+import { storeReelThumbnail } from "@/features/reels/instagram-thumbnail";
 import type { Reel } from "@/types/marketing";
 
 export type ReelRecord = {
@@ -45,7 +46,7 @@ export function toMarketingReel(row: ReelRecord): Reel {
     thumbnail: row.thumbnailUrl,
     instagramUrl: row.instagramUrl,
     productId: row.productId,
-    label: "من إنستغرام",
+    label: "لقطة من المطبخ",
   };
 }
 
@@ -74,18 +75,46 @@ export async function dbCreateReel(input: {
   if (!title) throw new BackendError("VALIDATION", "اكتب عنوان الريل");
 
   const max = await prisma.reel.aggregate({ _max: { sortOrder: true } });
+  const thumbnailUrl =
+    input.thumbnailUrl?.trim() ||
+    (await storeReelThumbnail(url)) ||
+    null;
   const row = await prisma.reel.create({
     data: {
       id: createOpaqueId("reel"),
       title,
       instagramUrl: url,
-      thumbnailUrl: input.thumbnailUrl?.trim() || null,
+      thumbnailUrl,
       productId: input.productId?.trim() || null,
       active: input.active ?? true,
       sortOrder: (max._max.sortOrder ?? 0) + 1,
     },
   });
   return mapReel(row);
+}
+
+/** Fill missing thumbnails for existing reels (best-effort). */
+export async function dbEnsureReelThumbnails(
+  ids?: string[],
+): Promise<number> {
+  const rows = await prisma.reel.findMany({
+    where: {
+      thumbnailUrl: null,
+      ...(ids?.length ? { id: { in: ids } } : {}),
+    },
+    select: { id: true, instagramUrl: true },
+  });
+  let updated = 0;
+  for (const row of rows) {
+    const thumb = await storeReelThumbnail(row.instagramUrl);
+    if (!thumb) continue;
+    await prisma.reel.update({
+      where: { id: row.id },
+      data: { thumbnailUrl: thumb },
+    });
+    updated += 1;
+  }
+  return updated;
 }
 
 export async function dbUpdateReel(
@@ -158,5 +187,38 @@ export async function dbMoveReel(
       data: { sortOrder: a.sortOrder },
     }),
   ]);
+  return dbListReels();
+}
+
+/** Rewrite sortOrder for all reels (1-based display order). */
+export async function dbReorderReels(
+  orderedIds: string[],
+): Promise<ReelRecord[]> {
+  if (!orderedIds.length) {
+    throw new BackendError("VALIDATION", "قائمة الترتيب فارغة");
+  }
+  const rows = await prisma.reel.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+  });
+  const currentIds = new Set(rows.map((r) => r.id));
+  if (
+    orderedIds.length !== rows.length ||
+    orderedIds.some((id) => !currentIds.has(id))
+  ) {
+    throw new BackendError(
+      "VALIDATION",
+      "ترتيب الريلز غير مكتمل — حدّث الصفحة وحاول مرة ثانية",
+    );
+  }
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.reel.update({
+        where: { id },
+        data: { sortOrder: index + 1 },
+      }),
+    ),
+  );
+
   return dbListReels();
 }

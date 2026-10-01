@@ -11,8 +11,50 @@ import { createOpaqueId } from "@/lib/id";
 import type {
   CreateProductInput,
   Product,
+  ProductOptionGroup,
+  ProductOptionGroupDraft,
   UpdateProductInput,
 } from "@/types/catalog";
+
+function draftsToOptionGroups(
+  productId: string,
+  drafts: ProductOptionGroupDraft[] | undefined,
+): ProductOptionGroup[] | undefined {
+  if (drafts === undefined) return undefined;
+  const groups: ProductOptionGroup[] = [];
+  drafts.forEach((g, gIndex) => {
+    const name = g.name.trim();
+    if (!name) return;
+    const groupId = g.id ?? createOpaqueId("pog");
+    const options = g.options
+      .map((o, oIndex) => {
+        const optionName = o.name.trim();
+        if (!optionName) return null;
+        return {
+          id: o.id ?? createOpaqueId("po"),
+          groupId,
+          name: optionName,
+          priceDelta: Math.trunc(o.priceDelta),
+          available: o.available,
+          sortOrder: o.sortOrder ?? oIndex + 1,
+        };
+      })
+      .filter((o): o is NonNullable<typeof o> => o != null);
+    if (!options.length) return;
+    groups.push({
+      id: groupId,
+      productId,
+      name,
+      selection: g.selection === "MULTI" ? "MULTI" : "SINGLE",
+      required: Boolean(g.required),
+      minSelect: g.minSelect,
+      maxSelect: g.maxSelect,
+      sortOrder: g.sortOrder ?? gIndex + 1,
+      options,
+    });
+  });
+  return groups;
+}
 
 const byId = new Map<string, Product>();
 const listeners = new Set<() => void>();
@@ -101,8 +143,9 @@ export function createProduct(input: CreateProductInput): Product {
   );
   const maxOrder = siblings.reduce((max, p) => Math.max(max, p.sortOrder), 0);
 
+  const productId = createOpaqueId("prod");
   const product: Product = {
-    id: createOpaqueId("prod"),
+    id: productId,
     name,
     description: (input.description ?? "").trim(),
     price: input.price,
@@ -113,6 +156,7 @@ export function createProduct(input: CreateProductInput): Product {
     sortOrder: input.sortOrder ?? maxOrder + 1,
     imageSrc: input.imageSrc?.trim() || undefined,
     imageAlt: input.imageAlt?.trim() || undefined,
+    optionGroups: draftsToOptionGroups(productId, input.optionGroups) ?? [],
     createdAt: now,
     updatedAt: now,
   };
@@ -163,6 +207,10 @@ export function updateProduct(id: string, input: UpdateProductInput): Product {
       input.imageAlt !== undefined
         ? input.imageAlt.trim() || undefined
         : existing.imageAlt,
+    optionGroups:
+      input.optionGroups !== undefined
+        ? draftsToOptionGroups(id, input.optionGroups) ?? []
+        : existing.optionGroups,
     updatedAt: new Date().toISOString(),
   };
 

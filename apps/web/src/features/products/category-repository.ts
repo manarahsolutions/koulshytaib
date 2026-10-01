@@ -154,10 +154,31 @@ export function moveCategory(id: string, direction: "up" | "down"): Category {
   return getCategoryById(id)!;
 }
 
+export function reorderCategories(orderedIds: string[]): Category[] {
+  ensureCatalogSeeded();
+  const current = listCategories();
+  const currentIds = new Set(current.map((c) => c.id));
+  if (
+    orderedIds.length !== current.length ||
+    orderedIds.some((id) => !currentIds.has(id))
+  ) {
+    throw new Error("CATEGORY_REORDER_INVALID");
+  }
+  const now = new Date().toISOString();
+  orderedIds.forEach((id, index) => {
+    const existing = byId.get(id);
+    if (!existing) return;
+    byId.set(id, { ...existing, sortOrder: index + 1, updatedAt: now });
+  });
+  emit();
+  return listCategories();
+}
+
 export const categoryRepository = {
   list: listCategories,
   getById: getCategoryById,
   create: createCategory,
   update: updateCategory,
   move: moveCategory,
+  reorder: reorderCategories,
 };

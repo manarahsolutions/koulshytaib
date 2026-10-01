@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { fetchAnalyticsAction } from "@/app/actions/backend";
 import {
   AdminPageHeader,
   AdminPanel,
 } from "@/components/admin/ui/admin-page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { downloadCsv, toCsv } from "@/lib/csv/download-csv";
+import { getIraqCalendarDayKey } from "@/lib/datetime/iraq-day";
 import { formatPriceIQD } from "@/lib/format/price";
-import type { ExtendedAnalytics } from "@/features/analytics/db-analytics-extended";
+import type {
+  AnalyticsRangePreset,
+  ExtendedAnalytics,
+} from "@/features/analytics/db-analytics-extended";
 
 const STATUS_AR: Record<string, string> = {
   received: "مستلم",
@@ -20,30 +25,70 @@ const STATUS_AR: Record<string, string> = {
   cancelled: "ملغى",
 };
 
+function isoToYmd(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return getIraqCalendarDayKey();
+  return getIraqCalendarDayKey(d);
+}
+
+function formatRangeLabel(fromIso: string, toIso: string): string {
+  const fmt = new Intl.DateTimeFormat("ar-IQ", {
+    timeZone: "Asia/Baghdad",
+    dateStyle: "medium",
+  });
+  return `${fmt.format(new Date(fromIso))} — ${fmt.format(new Date(toIso))}`;
+}
+
 export function AdminAnalyticsClient({
   initial,
 }: {
   initial: ExtendedAnalytics;
 }) {
+  const formId = useId();
   const [data, setData] = useState(initial);
-  const [preset, setPreset] = useState<"day" | "week" | "month">("week");
+  const [preset, setPreset] = useState<AnalyticsRangePreset>("week");
+  const [fromDate, setFromDate] = useState(() => isoToYmd(initial.range.from));
+  const [toDate, setToDate] = useState(() => isoToYmd(initial.range.to));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = async (next: "day" | "week" | "month") => {
+  const load = async (input: {
+    preset: AnalyticsRangePreset;
+    from?: string;
+    to?: string;
+  }) => {
     setBusy(true);
     setError(null);
-    setPreset(next);
+    setPreset(input.preset);
     try {
-      const result = await fetchAnalyticsAction({ preset: next });
+      const result = await fetchAnalyticsAction(input);
       if (!result.ok) {
         setError(result.message);
         return;
       }
-      setData(result.data as ExtendedAnalytics);
+      const next = result.data as ExtendedAnalytics;
+      setData(next);
+      setFromDate(isoToYmd(next.range.from));
+      setToDate(isoToYmd(next.range.to));
     } finally {
       setBusy(false);
     }
+  };
+
+  const reloadPreset = (next: "day" | "week" | "month") => {
+    void load({ preset: next });
+  };
+
+  const applyCustom = () => {
+    if (!fromDate || !toDate) {
+      setError("اختر تاريخ البداية والنهاية");
+      return;
+    }
+    if (fromDate > toDate) {
+      setError("تاريخ البداية لازم يكون قبل تاريخ النهاية أو يساويه");
+      return;
+    }
+    void load({ preset: "custom", from: fromDate, to: toDate });
   };
 
   const exportTop = () => {
@@ -67,6 +112,14 @@ export function AdminAnalyticsClient({
         title="التحليلات"
         description="تقارير من الطلبات حسب الفترة — قابلة للتصدير CSV."
         actions={
+          <Button type="button" size="sm" variant="secondary" onClick={exportTop}>
+            تصدير المنتجات CSV
+          </Button>
+        }
+      />
+
+      <AdminPanel>
+        <div className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
             {(["day", "week", "month"] as const).map((p) => (
               <Button
@@ -75,17 +128,84 @@ export function AdminAnalyticsClient({
                 size="sm"
                 variant={preset === p ? "primary" : "outline"}
                 loading={busy && preset === p}
-                onClick={() => void reload(p)}
+                disabled={busy}
+                onClick={() => reloadPreset(p)}
               >
                 {p === "day" ? "يوم" : p === "week" ? "أسبوع" : "شهر"}
               </Button>
             ))}
-            <Button type="button" size="sm" variant="secondary" onClick={exportTop}>
-              تصدير المنتجات CSV
+            <Button
+              type="button"
+              size="sm"
+              variant={preset === "custom" ? "primary" : "outline"}
+              disabled={busy}
+              onClick={() => setPreset("custom")}
+            >
+              مخصص
             </Button>
           </div>
-        }
-      />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-[10rem] flex-1 space-y-1.5 sm:max-w-[14rem]">
+              <label
+                htmlFor={`${formId}-from`}
+                className="typo-label text-text"
+              >
+                من تاريخ
+              </label>
+              <Input
+                id={`${formId}-from`}
+                type="date"
+                dir="ltr"
+                className="text-start"
+                value={fromDate}
+                max={toDate || undefined}
+                disabled={busy}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setPreset("custom");
+                }}
+              />
+            </div>
+            <div className="min-w-[10rem] flex-1 space-y-1.5 sm:max-w-[14rem]">
+              <label htmlFor={`${formId}-to`} className="typo-label text-text">
+                إلى تاريخ
+              </label>
+              <Input
+                id={`${formId}-to`}
+                type="date"
+                dir="ltr"
+                className="text-start"
+                value={toDate}
+                min={fromDate || undefined}
+                disabled={busy}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setPreset("custom");
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              size="md"
+              variant="primary"
+              loading={busy && preset === "custom"}
+              disabled={busy}
+              onClick={applyCustom}
+              className="min-h-11"
+            >
+              تطبيق الفترة
+            </Button>
+          </div>
+
+          <p className="text-sm text-text-muted" role="status">
+            الفترة الحالية:{" "}
+            <span className="font-medium text-text">
+              {formatRangeLabel(data.range.from, data.range.to)}
+            </span>
+          </p>
+        </div>
+      </AdminPanel>
 
       {error ? (
         <p className="text-sm text-danger" role="alert">

@@ -5,9 +5,8 @@ import { HeroSection } from "@/components/home/hero-section";
 import { OffersSection } from "@/components/home/offers-section";
 import { PopularProductsSection } from "@/components/home/popular-products-section";
 import { ReelsSection } from "@/components/home/reels-section";
-import { toMarketingReel, dbListReels } from "@/features/reels/db-reel-repository";
+import { toMarketingReel, dbListReels, dbEnsureReelThumbnails } from "@/features/reels/db-reel-repository";
 import { isDatabaseConfigured } from "@/lib/db/prisma";
-import { MOCK_REELS } from "@/features/marketing/mock-reels";
 import {
   getFeaturedOffer,
   getSecondaryOffers,
@@ -16,6 +15,7 @@ import {
   getHomeCategories,
   getHomePopularProducts,
 } from "@/features/products/mock-data";
+import type { Reel } from "@/types/marketing";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -36,15 +36,14 @@ export default async function HomePage() {
   const featured = getFeaturedOffer();
   const secondary = getSecondaryOffers();
 
-  let reels = MOCK_REELS;
+  let reels: Reel[] = [];
   if (isDatabaseConfigured()) {
     try {
+      await dbEnsureReelThumbnails();
       const rows = await dbListReels({ activeOnly: true });
-      if (rows.length > 0) {
-        reels = rows.map(toMarketingReel);
-      }
+      reels = rows.map(toMarketingReel);
     } catch {
-      // keep mocks if DB reel table not ready
+      reels = [];
     }
   }
 

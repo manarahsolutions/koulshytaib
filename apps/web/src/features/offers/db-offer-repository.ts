@@ -283,4 +283,33 @@ export async function dbMoveOffer(
   return (await dbGetOfferById(id))!;
 }
 
+/** Rewrite sortOrder for all offers (1-based display order). */
+export async function dbReorderOffers(orderedIds: string[]): Promise<Offer[]> {
+  if (!orderedIds.length) {
+    throw new BackendError("VALIDATION", "قائمة الترتيب فارغة");
+  }
+  const current = await dbListOffers();
+  const currentIds = new Set(current.map((o) => o.id));
+  if (
+    orderedIds.length !== current.length ||
+    orderedIds.some((id) => !currentIds.has(id))
+  ) {
+    throw new BackendError(
+      "VALIDATION",
+      "ترتيب العروض غير مكتمل — حدّث الصفحة وحاول مرة ثانية",
+    );
+  }
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.offer.update({
+        where: { id },
+        data: { sortOrder: index + 1 },
+      }),
+    ),
+  );
+
+  return dbListOffers();
+}
+
 export { demoteOtherFeatured };

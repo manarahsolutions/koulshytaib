@@ -12,9 +12,61 @@ import type {
   CreateCategoryInput,
   CreateProductInput,
   Product,
+  ProductOptionGroupDraft,
   UpdateCategoryInput,
   UpdateProductInput,
 } from "@/types/catalog";
+
+const productOptionsInclude = {
+  optionGroups: {
+    include: { options: true },
+    orderBy: [{ sortOrder: "asc" as const }, { name: "asc" as const }],
+  },
+};
+
+async function replaceProductOptionGroups(
+  productId: string,
+  drafts: ProductOptionGroupDraft[] | undefined,
+): Promise<void> {
+  await prisma.productOptionGroup.deleteMany({ where: { productId } });
+  if (!drafts?.length) return;
+
+  for (const [gIndex, group] of drafts.entries()) {
+    const name = group.name.trim();
+    if (!name) continue;
+    const options = group.options
+      .map((o, oIndex) => ({
+        name: o.name.trim(),
+        priceDelta: Math.trunc(o.priceDelta),
+        available: o.available,
+        sortOrder: o.sortOrder ?? oIndex + 1,
+      }))
+      .filter((o) => o.name.length > 0);
+    if (!options.length) continue;
+
+    await prisma.productOptionGroup.create({
+      data: {
+        id: createOpaqueId("pog"),
+        productId,
+        name,
+        selection: group.selection === "MULTI" ? "MULTI" : "SINGLE",
+        required: Boolean(group.required),
+        minSelect: group.minSelect ?? null,
+        maxSelect: group.maxSelect ?? null,
+        sortOrder: group.sortOrder ?? gIndex + 1,
+        options: {
+          create: options.map((o) => ({
+            id: createOpaqueId("po"),
+            name: o.name,
+            priceDelta: o.priceDelta,
+            available: o.available,
+            sortOrder: o.sortOrder,
+          })),
+        },
+      },
+    });
+  }
+}
 
 function categoryHref(id: string): string {
   return `/menu?category=${id}`;
@@ -106,15 +158,50 @@ export async function dbMoveCategory(
   return (await dbGetCategoryById(id))!;
 }
 
+/** Rewrite sortOrder for all categories (1-based display order). */
+export async function dbReorderCategories(
+  orderedIds: string[],
+): Promise<Category[]> {
+  if (!orderedIds.length) {
+    throw new BackendError("VALIDATION", "قائمة الترتيب فارغة");
+  }
+  const current = await dbListCategories();
+  const currentIds = new Set(current.map((c) => c.id));
+  if (
+    orderedIds.length !== current.length ||
+    orderedIds.some((id) => !currentIds.has(id))
+  ) {
+    throw new BackendError(
+      "VALIDATION",
+      "ترتيب التصنيفات غير مكتمل — حدّث الصفحة وحاول مرة ثانية",
+    );
+  }
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.category.update({
+        where: { id },
+        data: { sortOrder: index + 1 },
+      }),
+    ),
+  );
+
+  return dbListCategories();
+}
+
 export async function dbListProducts(): Promise<Product[]> {
   const rows = await prisma.product.findMany({
+    include: productOptionsInclude,
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
   return rows.map(mapProduct);
 }
 
 export async function dbGetProductById(id: string): Promise<Product | undefined> {
-  const row = await prisma.product.findUnique({ where: { id } });
+  const row = await prisma.product.findUnique({
+    where: { id },
+    include: productOptionsInclude,
+  });
   return row ? mapProduct(row) : undefined;
 }
 
@@ -157,7 +244,8 @@ export async function dbCreateProduct(
       imageAlt: input.imageAlt?.trim() || null,
     },
   });
-  return mapProduct(row);
+  await replaceProductOptionGroups(row.id, input.optionGroups);
+  return (await dbGetProductById(row.id))!;
 }
 
 export async function dbUpdateProduct(
@@ -214,7 +302,10 @@ export async function dbUpdateProduct(
           : existing.imageAlt,
     },
   });
-  return mapProduct(row);
+  if (input.optionGroups !== undefined) {
+    await replaceProductOptionGroups(id, input.optionGroups);
+  }
+  return (await dbGetProductById(row.id))!;
 }
 
 export async function dbMoveProduct(

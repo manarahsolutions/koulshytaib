@@ -170,3 +170,26 @@ body {
     transform: none;
   }
 }
+
+/* Order invoice print — only the invoice document is visible. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body.printing-order-invoice * {
+    visibility: hidden;
+  }
+
+  body.printing-order-invoice #order-invoice-print,
+  body.printing-order-invoice #order-invoice-print * {
+    visibility: visible;
+  }
+
+  body.printing-order-invoice #order-invoice-print {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    width: 100%;
+  }
+}

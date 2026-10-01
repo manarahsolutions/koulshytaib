@@ -7,6 +7,7 @@ import {
   getCategoryById,
   listCategories,
   moveCategory as repoMoveCategory,
+  reorderCategories as repoReorderCategories,
   updateCategory as repoUpdateCategory,
 } from "@/features/products/category-repository";
 import type {
@@ -63,6 +64,12 @@ export function moveCategory(
   direction: "up" | "down",
 ): CatalogResult<Category> {
   return wrap(() => repoMoveCategory(id, direction));
+}
+
+export function reorderCategories(
+  orderedIds: string[],
+): CatalogResult<Category[]> {
+  return wrap(() => repoReorderCategories(orderedIds));
 }
 
 export { getCategoryById, listCategories };

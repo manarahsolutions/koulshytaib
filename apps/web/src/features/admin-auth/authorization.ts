@@ -70,7 +70,7 @@ export async function requireAdmin(): Promise<AuthenticatedAdmin> {
   if (!user.isActive) {
     throw new AuthError(
       "ADMIN_INACTIVE",
-      "هذا الحساب معطّل. تواصل مع مالك النظام.",
+      "هذا الحساب معطّل. تواصل مع المدير.",
     );
   }
 

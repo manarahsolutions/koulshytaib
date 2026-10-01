@@ -12,6 +12,8 @@ import type {
   OrderItem as DbOrderItem,
   OrderStatusHistory as DbHistory,
   Product as DbProduct,
+  ProductOption as DbProductOption,
+  ProductOptionGroup as DbProductOptionGroup,
 } from "@prisma/client";
 import type { Customer } from "@/features/customers/types";
 import type {
@@ -20,7 +22,12 @@ import type {
   LoyaltyTransactionSource,
 } from "@/features/loyalty/types";
 import type { Offer } from "@/features/offers/types";
-import type { Category, Product, ProductBadge } from "@/types/catalog";
+import type {
+  Category,
+  Product,
+  ProductBadge,
+  ProductOptionGroup,
+} from "@/types/catalog";
 import type {
   Order,
   OrderLineSnapshot,
@@ -28,6 +35,12 @@ import type {
   OrderStatusEvent,
   PaymentMethodId,
 } from "@/types/order";
+
+export type DbProductWithOptions = DbProduct & {
+  optionGroups?: Array<
+    DbProductOptionGroup & { options: DbProductOption[] }
+  >;
+};
 
 export function mapCustomer(row: DbCustomer): Customer {
   return {
@@ -53,7 +66,39 @@ export function mapCategory(row: DbCategory): Category {
   };
 }
 
-export function mapProduct(row: DbProduct): Product {
+export function mapProductOptionGroups(
+  groups: Array<DbProductOptionGroup & { options: DbProductOption[] }>,
+): ProductOptionGroup[] {
+  return groups
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ar"))
+    .map((g) => ({
+      id: g.id,
+      productId: g.productId,
+      name: g.name,
+      selection: g.selection,
+      required: g.required,
+      minSelect: g.minSelect ?? undefined,
+      maxSelect: g.maxSelect ?? undefined,
+      sortOrder: g.sortOrder,
+      options: g.options
+        .slice()
+        .sort(
+          (a, b) =>
+            a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ar"),
+        )
+        .map((o) => ({
+          id: o.id,
+          groupId: o.groupId,
+          name: o.name,
+          priceDelta: o.priceDelta,
+          available: o.available,
+          sortOrder: o.sortOrder,
+        })),
+    }));
+}
+
+export function mapProduct(row: DbProductWithOptions): Product {
   const badges = row.badgesJson as ProductBadge[] | null;
   return {
     id: row.id,
@@ -68,6 +113,9 @@ export function mapProduct(row: DbProduct): Product {
     available: row.available,
     visible: row.visible,
     sortOrder: row.sortOrder,
+    optionGroups: row.optionGroups
+      ? mapProductOptionGroups(row.optionGroups)
+      : undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -100,6 +148,9 @@ export function mapOffer(
 }
 
 export function mapOrderItem(row: DbOrderItem): OrderLineSnapshot {
+  const optionsRaw = row.optionsJson as
+    | Array<{ groupName: string; optionName: string; priceDelta: number }>
+    | null;
   return {
     productId: row.productId ?? "",
     name: row.name,
@@ -107,6 +158,7 @@ export function mapOrderItem(row: DbOrderItem): OrderLineSnapshot {
     quantity: row.quantity,
     lineTotal: row.lineTotal,
     notes: row.notes ?? undefined,
+    options: optionsRaw ?? undefined,
   };
 }
 

@@ -25,3 +25,10 @@ export function normalizeInstagramReelUrl(raw: string): string | null {
   if (!href.endsWith("/")) href += "/";
   return href;
 }
+
+/** Official Instagram embed URL for in-page playback. */
+export function toInstagramEmbedUrl(raw: string): string | null {
+  const permalink = normalizeInstagramReelUrl(raw);
+  if (!permalink) return null;
+  return `${permalink}embed`;
+}

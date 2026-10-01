@@ -1,6 +1,10 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
+import {
+  groupsFromProduct,
+  ProductOptionGroupsEditor,
+} from "@/components/admin/product-option-groups-editor";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FoodMediaPlaceholder } from "@/components/product/food-media-placeholder";
@@ -8,7 +12,11 @@ import { ImageSrcField } from "@/components/admin/image-src-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Category, Product } from "@/types/catalog";
+import type {
+  Category,
+  Product,
+  ProductOptionGroupDraft,
+} from "@/types/catalog";
 
 export type ProductFormValues = {
   name: string;
@@ -20,19 +28,24 @@ export type ProductFormValues = {
   visible: boolean;
 };
 
+export type ProductFormSubmitValues = {
+  name: string;
+  description: string;
+  price: number;
+  categoryId: string;
+  imageSrc?: string;
+  available: boolean;
+  visible: boolean;
+  optionGroups: ProductOptionGroupDraft[];
+};
+
 export type ProductFormProps = {
   categories: Category[];
   initial?: Product;
   submitLabel: string;
-  onSubmit: (values: {
-    name: string;
-    description: string;
-    price: number;
-    categoryId: string;
-    imageSrc?: string;
-    available: boolean;
-    visible: boolean;
-  }) => Promise<string | null> | string | null;
+  onSubmit: (
+    values: ProductFormSubmitValues,
+  ) => Promise<string | null> | string | null;
 };
 
 function toValues(product?: Product): ProductFormValues {
@@ -57,7 +70,12 @@ export function ProductForm({
   const [values, setValues] = useState<ProductFormValues>(() =>
     toValues(initial),
   );
-  const [errors, setErrors] = useState<Partial<Record<keyof ProductFormValues, string>>>({});
+  const [optionGroups, setOptionGroups] = useState<ProductOptionGroupDraft[]>(
+    () => groupsFromProduct(initial),
+  );
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof ProductFormValues, string>>
+  >({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -88,6 +106,18 @@ export function ProductForm({
     setFormError(null);
     if (!validate()) return;
 
+    for (const group of optionGroups) {
+      if (!group.name.trim()) {
+        setFormError("اكتب اسم كل مجموعة خيارات، أو احذف الفارغة");
+        return;
+      }
+      const named = group.options.filter((o) => o.name.trim());
+      if (named.length === 0) {
+        setFormError(`أضف خياراً واحداً على الأقل لمجموعة «${group.name}»`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const message = await onSubmit({
@@ -98,6 +128,18 @@ export function ProductForm({
         imageSrc: values.imageSrc.trim() || undefined,
         available: values.available,
         visible: values.visible,
+        optionGroups: optionGroups.map((g, gIndex) => ({
+          ...g,
+          name: g.name.trim(),
+          sortOrder: gIndex + 1,
+          options: g.options
+            .filter((o) => o.name.trim())
+            .map((o, oIndex) => ({
+              ...o,
+              name: o.name.trim(),
+              sortOrder: oIndex + 1,
+            })),
+        })),
       });
       if (message) setFormError(message);
     } finally {
@@ -134,7 +176,7 @@ export function ProductForm({
 
           <div>
             <label htmlFor={priceId} className="typo-label text-text">
-              السعر (د.ع) <span className="text-danger">*</span>
+              السعر الأساسي (د.ع) <span className="text-danger">*</span>
             </label>
             <Input
               id={priceId}
@@ -254,6 +296,11 @@ export function ProductForm({
           ) : null}
         </div>
       </div>
+
+      <ProductOptionGroupsEditor
+        groups={optionGroups}
+        onChange={setOptionGroups}
+      />
 
       {formError ? (
         <p className="text-sm text-danger" role="alert">

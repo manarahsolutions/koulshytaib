@@ -11,11 +11,13 @@ import {
   selectCartItemQuantity,
   useCartStore,
 } from "@/features/cart/cart-store";
+import { productHasRequiredOptions } from "@/features/products/product-options";
 import { isProductAvailable } from "@/features/products/selectors";
 import { ICON_STROKE } from "@/lib/ui/icon-stroke";
 import { cn } from "@/lib/utils/cn";
 import type { Product } from "@/types/catalog";
 import { FoodMediaPlaceholder } from "./food-media-placeholder";
+import { useRouter } from "next/navigation";
 
 export type ProductCardProps = {
   product: Product;
@@ -37,9 +39,11 @@ export function ProductCard({
   className,
   layout = "grid",
 }: ProductCardProps) {
+  const router = useRouter();
   const badge = (product.badges ?? [])[0];
   const hasImage = Boolean(product.imageSrc);
   const available = isProductAvailable(product);
+  const needsOptions = productHasRequiredOptions(product);
   const quantity = useCartStore((s) =>
     selectCartItemQuantity(s, product.id),
   );
@@ -52,8 +56,62 @@ export function ProductCard({
       onAdd(product);
       return;
     }
+    if (needsOptions) {
+      router.push(`/product/${product.id}`);
+      return;
+    }
     addItem(product.id, 1);
   };
+
+  const quantityControl =
+    !available ? (
+      <span className="shrink-0 text-xs font-medium text-text-subtle">
+        غير متوفر
+      </span>
+    ) : needsOptions ? (
+      <Link
+        href={`/product/${product.id}`}
+        className={cn(
+          "inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-on-primary shadow-xs",
+          "hover:bg-brand-primary-hover",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+        )}
+        aria-label={`اختَر خيارات ${product.name}`}
+      >
+        <Plus
+          className="size-4"
+          strokeWidth={ICON_STROKE.emphasis}
+          aria-hidden
+        />
+      </Link>
+    ) : quantity > 0 ? (
+      <QuantityStepper
+        value={quantity}
+        min={0}
+        max={99}
+        size="sm"
+        aria-label={`كمية ${product.name}`}
+        onChange={(next) => setQuantity(product.id, next)}
+      />
+    ) : (
+      <button
+        type="button"
+        onClick={handleAdd}
+        className={cn(
+          "inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-on-primary shadow-xs",
+          "transition-colors duration-[var(--duration-fast)]",
+          "hover:bg-brand-primary-hover",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+        )}
+        aria-label={`إضافة ${product.name} إلى السلة`}
+      >
+        <Plus
+          className="size-4"
+          strokeWidth={ICON_STROKE.emphasis}
+          aria-hidden
+        />
+      </button>
+    );
 
   if (layout === "list") {
     return (
@@ -108,38 +166,7 @@ export function ProductCard({
               stack
               className="min-w-0"
             />
-            {!available ? (
-              <span className="shrink-0 text-xs font-medium text-text-subtle">
-                غير متوفر
-              </span>
-            ) : quantity > 0 ? (
-              <QuantityStepper
-                value={quantity}
-                min={0}
-                max={99}
-                size="sm"
-                aria-label={`كمية ${product.name}`}
-                onChange={(next) => setQuantity(product.id, next)}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={handleAdd}
-                className={cn(
-                  "inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-primary text-on-primary shadow-xs",
-                  "transition-colors duration-[var(--duration-fast)]",
-                  "hover:bg-brand-primary-hover",
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
-                )}
-                aria-label={`إضافة ${product.name} إلى السلة`}
-              >
-                <Plus
-                  className="size-4"
-                  strokeWidth={ICON_STROKE.emphasis}
-                  aria-hidden
-                />
-              </button>
-            )}
+            {quantityControl}
           </div>
         </div>
       </article>
@@ -231,39 +258,7 @@ export function ProductCard({
             stack
             className="min-w-0"
           />
-
-          {!available ? (
-            <span className="shrink-0 text-xs font-medium text-text-subtle">
-              غير متوفر
-            </span>
-          ) : quantity > 0 ? (
-            <QuantityStepper
-              value={quantity}
-              min={0}
-              max={99}
-              size="sm"
-              aria-label={`كمية ${product.name}`}
-              onChange={(next) => setQuantity(product.id, next)}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={handleAdd}
-              className={cn(
-                "inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-on-primary shadow-xs",
-                "transition-colors duration-[var(--duration-fast)]",
-                "hover:bg-brand-primary-hover",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
-              )}
-              aria-label={`إضافة ${product.name} إلى السلة`}
-            >
-              <Plus
-                className="size-4"
-                strokeWidth={ICON_STROKE.emphasis}
-                aria-hidden
-              />
-            </button>
-          )}
+          {quantityControl}
         </div>
       </div>
     </article>

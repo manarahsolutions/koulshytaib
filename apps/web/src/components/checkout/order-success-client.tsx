@@ -10,12 +10,12 @@ import { OrderSummaryCard } from "@/components/orders/order-summary-card";
 import { PageContainer } from "@/components/layout/page-container";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getOrderStatusLabel } from "@/features/orders/status";
-import { useActiveOrder } from "@/features/orders/use-active-order";
+import { useLiveActiveOrder } from "@/features/orders/use-live-active-order";
 import { ICON_STROKE } from "@/lib/ui/icon-stroke";
 import { cn } from "@/lib/utils/cn";
 
 export function OrderSuccessClient() {
-  const order = useActiveOrder();
+  const { order, liveTracking } = useLiveActiveOrder();
   const [kitchenUrl, setKitchenUrl] = useState<string | null | undefined>(
     undefined,
   );
@@ -39,7 +39,7 @@ export function OrderSuccessClient() {
     return () => {
       cancelled = true;
     };
-  }, [order]);
+  }, [order?.id]);
 
   if (!order) {
     return (
@@ -66,6 +66,8 @@ export function OrderSuccessClient() {
   }
 
   const statusLabel = getOrderStatusLabel(order.status);
+  const terminal =
+    order.status === "delivered" || order.status === "cancelled";
 
   const openKitchenWhatsApp = () => {
     if (!kitchenUrl) return;
@@ -165,6 +167,11 @@ export function OrderSuccessClient() {
         >
           {statusLabel}
         </h2>
+        {liveTracking && !terminal ? (
+          <p className="typo-caption mt-1 text-text-subtle">
+            يتحدّث تلقائياً لما المطبخ يحدّث الحالة
+          </p>
+        ) : null}
         <div className="mt-5">
           <OrderStatusTimeline
             currentStatus={order.status}

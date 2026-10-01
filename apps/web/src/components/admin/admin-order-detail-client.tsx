@@ -8,6 +8,7 @@ import {
   getAdminKitchenWhatsAppLinkAction,
   getCustomerStatusWhatsAppLinkAction,
 } from "@/app/actions/backend";
+import { AdminOrderInvoice } from "@/components/admin/admin-order-invoice";
 import { AdminOrderNotifications } from "@/components/admin/admin-order-notifications";
 import { AdminStatusTimeline } from "@/components/admin/admin-status-timeline";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
@@ -83,8 +84,8 @@ export function AdminOrderDetailClient() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="space-y-6 print:space-y-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
           <p className="typo-caption text-text-muted">
             <Link
@@ -110,16 +111,20 @@ export function AdminOrderDetailClient() {
 
       {error ? (
         <p
-          className="rounded-lg border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger"
+          className="rounded-lg border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger print:hidden"
           role="alert"
         >
           {error}
         </p>
       ) : null}
 
-      <OrderStatusActions order={order} onError={setError} />
+      <div className="print:hidden">
+        <OrderStatusActions order={order} onError={setError} />
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <AdminOrderInvoice order={order} />
+
+      <div className="grid gap-4 sm:grid-cols-2 print:hidden">
         <div className="rounded-lg border border-border bg-surface-elevated p-4">
           <h2 className="text-base font-semibold text-brand-navy">
             واتساب الزبون
@@ -160,7 +165,7 @@ export function AdminOrderDetailClient() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 print:hidden">
         <section className="rounded-lg border border-border bg-surface-elevated p-4">
           <h2 className="text-base font-semibold text-brand-navy">العميل</h2>
           <dl className="mt-3 space-y-2 text-sm">
@@ -196,12 +201,24 @@ export function AdminOrderDetailClient() {
           <ul className="mt-3 space-y-2 text-sm">
             {order.items.map((line) => (
               <li
-                key={`${line.productId}-${line.name}`}
+                key={`${line.productId}-${line.name}-${line.notes ?? ""}`}
                 className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border-soft pb-2 last:border-0 last:pb-0"
               >
                 <span>
                   {line.name}{" "}
                   <span className="text-text-muted">× {line.quantity}</span>
+                  {line.options?.length ? (
+                    <span className="mt-0.5 block text-xs text-text-muted">
+                      {line.options
+                        .map((o) => `${o.groupName}: ${o.optionName}`)
+                        .join(" · ")}
+                    </span>
+                  ) : null}
+                  {line.notes ? (
+                    <span className="mt-0.5 block text-xs text-text-muted">
+                      {line.notes}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="font-medium">
                   {formatPriceIQD(line.lineTotal)}

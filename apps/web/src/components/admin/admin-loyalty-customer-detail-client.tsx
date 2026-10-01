@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Gift, UserRound } from "lucide-react";
+import { Gift, MessageCircle, UserRound } from "lucide-react";
 import { CustomerTypeBadge } from "@/components/admin/customer-type-badge";
 import { LoyaltyAdjustmentForm } from "@/components/admin/loyalty-adjustment-form";
+import { LoyaltyRedeemForm } from "@/components/admin/loyalty-redeem-form";
 import {
   LoyaltyTransactionCards,
   LoyaltyTransactionTable,
   LoyaltyTxnFilters,
 } from "@/components/admin/loyalty-transaction-list";
 import { StatCard } from "@/components/admin/stat-card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getCustomerById } from "@/features/customers/customer-service";
 import {
@@ -31,8 +33,38 @@ import {
   getLoyaltyTransactions,
 } from "@/features/loyalty/loyalty-service";
 import { useLoyaltyRevision } from "@/features/loyalty/use-admin-loyalty";
+import {
+  buildWaMeUrl,
+  iraqiLocalToE164,
+} from "@/features/notifications/whatsapp-deeplink";
 import { formatIraqDateTime } from "@/lib/datetime/iraq-day";
 import { formatPoints } from "@/lib/format/points";
+
+function buildLoyaltyWhatsAppText(input: {
+  name: string;
+  balance: number | null;
+  earningEnabled: boolean;
+  earnRate: number;
+}): string {
+  const name = input.name.trim() || "زبوننا الكريم";
+  const lines = [
+    `مرحبا ${name} 👋`,
+    "تحية من كلشي طيب",
+    "",
+  ];
+  if (input.balance != null) {
+    lines.push(`رصيد نقاطك الحالي: ${formatPoints(input.balance)} نقطة`);
+  } else {
+    lines.push("حساب الولاء يُفعَّل مع طلباتك عندنا.");
+  }
+  if (input.earningEnabled && input.earnRate > 0) {
+    lines.push(
+      `تكسب نقاطاً على الطلبات المكتملة (معدل: ${input.earnRate} نقطة لكل دينار).`,
+    );
+  }
+  lines.push("", "إذا تحب تستفيد من نقاطك، راسلنا هنا ونرتبلك خصم أو هدية.");
+  return lines.join("\n");
+}
 
 export function AdminLoyaltyCustomerDetailClient() {
   const params = useParams<{ id: string }>();
@@ -41,6 +73,7 @@ export function AdminLoyaltyCustomerDetailClient() {
   const revision = useLoyaltyRevision();
   const [txnFilter, setTxnFilter] = useState<LoyaltyTxnFilter>("all");
   const [, setTick] = useState(0);
+  const [waError, setWaError] = useState<string | null>(null);
 
   const customer = useMemo(
     () => (customerId ? getCustomerById(customerId) : null),
@@ -93,6 +126,22 @@ export function AdminLoyaltyCustomerDetailClient() {
   const redeemed = account ? getLifetimeRedeemed(customer.id) : null;
   const latest = transactions[0] ?? null;
 
+  const openWhatsApp = () => {
+    setWaError(null);
+    const e164 = iraqiLocalToE164(customer.phone);
+    if (!e164) {
+      setWaError("رقم الهاتف غير صالح لواتساب");
+      return;
+    }
+    const text = buildLoyaltyWhatsAppText({
+      name: customer.name ?? "",
+      balance,
+      earningEnabled: config.enabled && config.earning.enabled,
+      earnRate: config.earning.pointsPerCurrencyUnit,
+    });
+    window.open(buildWaMeUrl(e164, text), "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -126,13 +175,27 @@ export function AdminLoyaltyCustomerDetailClient() {
         >
           عرض ملف الزبون
         </Link>
+        <Button
+          type="button"
+          variant="secondary"
+          className="min-h-11 gap-2"
+          onClick={openWhatsApp}
+          startIcon={<MessageCircle className="size-4" aria-hidden />}
+        >
+          واتساب الزبون
+        </Button>
       </div>
+      {waError ? (
+        <p className="text-sm text-danger" role="alert">
+          {waError}
+        </p>
+      ) : null}
 
       {!account ? (
         <EmptyState
           icon={<Gift />}
           title="لا يوجد حساب ولاء"
-          description="ما اننشأ حساب ولاء لهذا الزبون بعد."
+          description="الحساب ينشأ تلقائياً مع طلبات الزبون. تقدر تراسله واتساب من الزر أعلاه."
         />
       ) : (
         <>
@@ -159,19 +222,31 @@ export function AdminLoyaltyCustomerDetailClient() {
             </div>
           </section>
 
-          <p className="rounded-md border border-border bg-surface-warm px-3 py-2 text-sm text-text-muted" role="status">
-            {config.redemption.enabled
-              ? "استبدال النقاط مفعّل في الإعدادات."
-              : "استبدال النقاط غير متاح حالياً."}{" "}
-            {config.earning.enabled
-              ? ""
-              : "اكتساب النقاط غير مفعّل حالياً."}
-          </p>
+          <div className="rounded-lg border border-border-soft bg-surface-warm px-3 py-2 text-sm text-text-muted">
+            <p>
+              {config.enabled
+                ? "النظام مفعّل."
+                : "النظام غير مفعّل — فعّله من صفحة الولاء."}{" "}
+              {config.earning.enabled && config.earning.pointsPerCurrencyUnit > 0
+                ? `الاكتساب التلقائي: ${config.earning.pointsPerCurrencyUnit} نقطة/دينار عند التسليم.`
+                : "الاكتساب التلقائي متوقف أو المعدل صفر."}{" "}
+              {config.redemption.enabled
+                ? "خصم النقاط مسموح من النموذج أدناه."
+                : "خصم النقاط مقفول حتى تفعّله بالإعدادات."}
+            </p>
+          </div>
 
-          <LoyaltyAdjustmentForm
-            customerId={customer.id}
-            onSuccess={() => setTick((n) => n + 1)}
-          />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <LoyaltyRedeemForm
+              customerId={customer.id}
+              balance={balance ?? 0}
+              onSuccess={() => setTick((n) => n + 1)}
+            />
+            <LoyaltyAdjustmentForm
+              customerId={customer.id}
+              onSuccess={() => setTick((n) => n + 1)}
+            />
+          </div>
 
           <section className="space-y-3" aria-labelledby="loyalty-history-heading">
             <h2
