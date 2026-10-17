@@ -8,10 +8,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FoodMediaPlaceholder } from "@/components/product/food-media-placeholder";
-import { ImageSrcField } from "@/components/admin/image-src-field";
+import { ProductImagesField } from "@/components/admin/product-images-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getProductImages } from "@/features/products/product-images";
 import type {
   Category,
   Product,
@@ -23,7 +24,8 @@ export type ProductFormValues = {
   description: string;
   price: string;
   categoryId: string;
-  imageSrc: string;
+  /** Ordered photos — first is the cover. */
+  images: string[];
   available: boolean;
   visible: boolean;
 };
@@ -33,7 +35,8 @@ export type ProductFormSubmitValues = {
   description: string;
   price: number;
   categoryId: string;
-  imageSrc?: string;
+  imageSrc: string;
+  galleryImages: string[];
   available: boolean;
   visible: boolean;
   optionGroups: ProductOptionGroupDraft[];
@@ -54,7 +57,7 @@ function toValues(product?: Product): ProductFormValues {
     description: product?.description ?? "",
     price: product ? String(product.price) : "",
     categoryId: product?.categoryId ?? "",
-    imageSrc: product?.imageSrc ?? "",
+    images: product ? getProductImages(product) : [],
     available: product?.available ?? true,
     visible: product?.visible ?? true,
   };
@@ -83,7 +86,6 @@ export function ProductForm({
   const priceId = `${formId}-price`;
   const categoryId = `${formId}-category`;
   const descriptionId = `${formId}-description`;
-  const imageId = `${formId}-image`;
 
   const validate = (): boolean => {
     const next: typeof errors = {};
@@ -125,7 +127,8 @@ export function ProductForm({
         description: values.description.trim(),
         price: Number(values.price),
         categoryId: values.categoryId,
-        imageSrc: values.imageSrc.trim() || undefined,
+        imageSrc: values.images[0] ?? "",
+        galleryImages: values.images.slice(1),
         available: values.available,
         visible: values.visible,
         optionGroups: optionGroups.map((g, gIndex) => ({
@@ -244,11 +247,10 @@ export function ProductForm({
             />
           </div>
 
-          <ImageSrcField
-            label="صورة المنتج"
-            inputId={imageId}
-            value={values.imageSrc}
-            onChange={(imageSrc) => setValues((v) => ({ ...v, imageSrc }))}
+          <ProductImagesField
+            label="صور المنتج"
+            value={values.images}
+            onChange={(images) => setValues((v) => ({ ...v, images }))}
           />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
@@ -274,12 +276,12 @@ export function ProductForm({
         </div>
 
         <div className="rounded-lg border border-border bg-surface-elevated p-3">
-          <p className="typo-label text-text-muted">معاينة الصورة</p>
+          <p className="typo-label text-text-muted">معاينة الصورة الرئيسية</p>
           <div className="relative mt-2 aspect-[4/3] overflow-hidden rounded-md border border-border-soft">
-            {values.imageSrc.trim() ? (
+            {values.images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={values.imageSrc.trim()}
+                src={values.images[0]}
                 alt=""
                 className="size-full object-cover"
               />
@@ -291,7 +293,7 @@ export function ProductForm({
               />
             )}
           </div>
-          {!values.imageSrc.trim() ? (
+          {values.images.length === 0 ? (
             <p className="mt-2 text-xs text-text-muted">لا توجد صورة</p>
           ) : null}
         </div>

@@ -5,6 +5,7 @@
 import {
   CakeSlice,
   CookingPot,
+  Croissant,
   CupSoda,
   HandPlatter,
   Salad,
@@ -22,6 +23,26 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   drinks: CupSoda,
 };
 
-export function getCategoryIcon(categoryId: string): LucideIcon {
-  return CATEGORY_ICONS[categoryId] ?? HandPlatter;
+/** Dashboard categories have opaque ids, so match on the Arabic name. */
+const NAME_ICONS: [RegExp, LucideIcon][] = [
+  [/محاشي|محشي|دولم/, CookingPot],
+  [/مقبلات|كبة|سمبوس/, Salad],
+  [/معجنات|مخبوزات|فطائر/, Croissant],
+  [/حلويات|كليچة|كليجة/, CakeSlice],
+  [/مرق|شوربة/, Soup],
+  [/مشروب|عصير/, CupSoda],
+];
+
+export function getCategoryIcon(
+  categoryId: string,
+  categoryName?: string,
+): LucideIcon {
+  const byId = CATEGORY_ICONS[categoryId];
+  if (byId) return byId;
+  if (categoryName) {
+    for (const [pattern, icon] of NAME_ICONS) {
+      if (pattern.test(categoryName)) return icon;
+    }
+  }
+  return HandPlatter;
 }

@@ -144,7 +144,7 @@ export function MenuPageClient() {
               الكل
             </button>
             {categories.map((category) => {
-              const Icon = getCategoryIcon(category.id);
+              const Icon = getCategoryIcon(category.id, category.name);
               const active = categoryId === category.id;
               return (
                 <button

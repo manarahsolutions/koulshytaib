@@ -1,13 +1,13 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { DecorativeMotif } from "@/components/brand/decorative-motif";
 import { PageContainer } from "@/components/layout/page-container";
 import { FoodMediaPlaceholder } from "@/components/product/food-media-placeholder";
+import { ProductGallery } from "@/components/product/product-gallery";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,7 @@ import {
   productHasOptions,
   resolveAndValidateSelections,
 } from "@/features/products/product-options";
+import { getProductImages } from "@/features/products/product-images";
 import { getProductById } from "@/features/products/product-repository";
 import {
   isProductAvailable,
@@ -90,7 +91,7 @@ export function ProductDetailClient() {
   const available = isProductAvailable(product);
   const category = getCategoryById(product.categoryId);
   const badge = product.badges?.[0];
-  const hasImage = Boolean(product.imageSrc);
+  const images = getProductImages(product);
   const groups = product.optionGroups ?? [];
   const hasOptions = productHasOptions(product);
 
@@ -142,14 +143,10 @@ export function ProductDetailClient() {
           )}
         >
           <div className="relative aspect-[5/4] sm:aspect-[16/10] lg:aspect-[2/1]">
-            {hasImage && product.imageSrc ? (
-              <Image
-                src={product.imageSrc}
+            {images.length > 0 ? (
+              <ProductGallery
+                images={images}
                 alt={product.imageAlt ?? product.name}
-                fill
-                priority
-                className="object-cover"
-                sizes="(max-width:1024px) 100vw, 960px"
               />
             ) : (
               <FoodMediaPlaceholder

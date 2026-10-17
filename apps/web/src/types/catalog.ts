@@ -88,6 +88,8 @@ export type Product = {
   /** Public URL path when a real photo exists */
   imageSrc?: string;
   imageAlt?: string;
+  /** Extra photos after the cover (imageSrc), in display order */
+  galleryImages?: string[];
   badges?: ProductBadge[];
   categoryId: string;
   /** Can the customer order it now? */
@@ -109,6 +111,7 @@ export type CreateProductInput = {
   visible?: boolean;
   imageSrc?: string;
   imageAlt?: string;
+  galleryImages?: string[];
   oldPrice?: number;
   sortOrder?: number;
   optionGroups?: ProductOptionGroupDraft[];

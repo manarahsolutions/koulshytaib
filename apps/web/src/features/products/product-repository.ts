@@ -156,6 +156,7 @@ export function createProduct(input: CreateProductInput): Product {
     sortOrder: input.sortOrder ?? maxOrder + 1,
     imageSrc: input.imageSrc?.trim() || undefined,
     imageAlt: input.imageAlt?.trim() || undefined,
+    galleryImages: input.galleryImages ?? [],
     optionGroups: draftsToOptionGroups(productId, input.optionGroups) ?? [],
     createdAt: now,
     updatedAt: now,
@@ -207,6 +208,7 @@ export function updateProduct(id: string, input: UpdateProductInput): Product {
       input.imageAlt !== undefined
         ? input.imageAlt.trim() || undefined
         : existing.imageAlt,
+    galleryImages: input.galleryImages ?? existing.galleryImages,
     optionGroups:
       input.optionGroups !== undefined
         ? draftsToOptionGroups(id, input.optionGroups) ?? []

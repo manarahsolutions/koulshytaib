@@ -68,6 +68,10 @@ async function replaceProductOptionGroups(
   }
 }
 
+function cleanImageList(urls: string[] | undefined): string[] {
+  return (urls ?? []).map((u) => u.trim()).filter(Boolean);
+}
+
 function categoryHref(id: string): string {
   return `/menu?category=${id}`;
 }
@@ -242,6 +246,7 @@ export async function dbCreateProduct(
       sortOrder: input.sortOrder ?? maxOrder + 1,
       imageSrc: input.imageSrc?.trim() || null,
       imageAlt: input.imageAlt?.trim() || null,
+      galleryImages: cleanImageList(input.galleryImages),
     },
   });
   await replaceProductOptionGroups(row.id, input.optionGroups);
@@ -300,6 +305,10 @@ export async function dbUpdateProduct(
         input.imageAlt !== undefined
           ? input.imageAlt.trim() || null
           : existing.imageAlt,
+      galleryImages:
+        input.galleryImages !== undefined
+          ? cleanImageList(input.galleryImages)
+          : existing.galleryImages,
     },
   });
   if (input.optionGroups !== undefined) {

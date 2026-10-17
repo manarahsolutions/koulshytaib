@@ -57,7 +57,7 @@ export function CategoryScroller({
           className="gap-3 ps-4 sm:ps-6 lg:ps-8"
         >
           {categories.map((category) => {
-            const Icon = getCategoryIcon(category.id);
+            const Icon = getCategoryIcon(category.id, category.name);
             return (
               <Link
                 key={category.id}

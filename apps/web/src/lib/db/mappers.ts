@@ -108,6 +108,7 @@ export function mapProduct(row: DbProductWithOptions): Product {
     oldPrice: row.oldPrice ?? undefined,
     imageSrc: row.imageSrc ?? undefined,
     imageAlt: row.imageAlt ?? undefined,
+    galleryImages: row.galleryImages ?? [],
     badges: badges ?? undefined,
     categoryId: row.categoryId,
     available: row.available,

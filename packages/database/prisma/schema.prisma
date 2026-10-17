@@ -147,6 +147,8 @@ model Product {
   oldPrice    Int?
   imageSrc    String?
   imageAlt    String?
+  /// Extra product photos shown after imageSrc (cover) in the gallery
+  galleryImages String[] @default([])
   /// JSON array of ProductBadge or null
   badgesJson  Json?
   available   Boolean  @default(true)
