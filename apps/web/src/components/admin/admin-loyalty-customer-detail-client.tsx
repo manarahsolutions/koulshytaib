@@ -44,7 +44,7 @@ function buildLoyaltyWhatsAppText(input: {
   name: string;
   balance: number | null;
   earningEnabled: boolean;
-  earnRate: number;
+  iqdPerPoint: number;
 }): string {
   const name = input.name.trim() || "زبوننا الكريم";
   const lines = [
@@ -57,9 +57,9 @@ function buildLoyaltyWhatsAppText(input: {
   } else {
     lines.push("حساب الولاء يُفعَّل مع طلباتك عندنا.");
   }
-  if (input.earningEnabled && input.earnRate > 0) {
+  if (input.earningEnabled && input.iqdPerPoint > 0) {
     lines.push(
-      `تكسب نقاطاً على الطلبات المكتملة (معدل: ${input.earnRate} نقطة لكل دينار).`,
+      `تكسب نقاطاً على الطلبات المكتملة (نقطة لكل ${formatPoints(input.iqdPerPoint)} د.ع).`,
     );
   }
   lines.push("", "إذا تحب تستفيد من نقاطك، راسلنا هنا ونرتبلك خصم أو هدية.");
@@ -137,7 +137,7 @@ export function AdminLoyaltyCustomerDetailClient() {
       name: customer.name ?? "",
       balance,
       earningEnabled: config.enabled && config.earning.enabled,
-      earnRate: config.earning.pointsPerCurrencyUnit,
+      iqdPerPoint: config.earning.iqdPerPoint,
     });
     window.open(buildWaMeUrl(e164, text), "_blank", "noopener,noreferrer");
   };
@@ -227,8 +227,8 @@ export function AdminLoyaltyCustomerDetailClient() {
               {config.enabled
                 ? "النظام مفعّل."
                 : "النظام غير مفعّل — فعّله من صفحة الولاء."}{" "}
-              {config.earning.enabled && config.earning.pointsPerCurrencyUnit > 0
-                ? `الاكتساب التلقائي: ${config.earning.pointsPerCurrencyUnit} نقطة/دينار عند التسليم.`
+              {config.earning.enabled && config.earning.iqdPerPoint > 0
+                ? `الاكتساب التلقائي: نقطة لكل ${formatPoints(config.earning.iqdPerPoint)} د.ع عند التسليم.`
                 : "الاكتساب التلقائي متوقف أو المعدل صفر."}{" "}
               {config.redemption.enabled
                 ? "خصم النقاط مسموح من النموذج أدناه."

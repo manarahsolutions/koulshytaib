@@ -21,7 +21,7 @@ export function LoyaltySettingsForm({
   const [enabled, setEnabled] = useState(current.enabled);
   const [earningEnabled, setEarningEnabled] = useState(current.earning.enabled);
   const [earnRate, setEarnRate] = useState(
-    String(current.earning.pointsPerCurrencyUnit),
+    String(current.earning.iqdPerPoint),
   );
   const [redemptionEnabled, setRedemptionEnabled] = useState(
     current.redemption.enabled,
@@ -64,7 +64,7 @@ export function LoyaltySettingsForm({
         enabled,
         earning: {
           enabled: enabled && earningEnabled,
-          pointsPerCurrencyUnit: earnN,
+          iqdPerPoint: earnN,
         },
         redemption: {
           enabled: enabled && redemptionEnabled,
@@ -121,7 +121,7 @@ export function LoyaltySettingsForm({
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
           <label htmlFor={`${formId}-earn-rate`} className="typo-label text-text">
-            نقاط لكل دينار (اكتساب)
+            كم دينار = نقطة وحدة (اكتساب)
           </label>
           <Input
             id={`${formId}-earn-rate`}
@@ -133,7 +133,7 @@ export function LoyaltySettingsForm({
             onChange={(e) => setEarnRate(e.target.value)}
           />
           <p className="typo-caption text-text-subtle">
-            مثال: طلب 10,000 د.ع × المعدل = النقاط. خلّيه 0 إذا تبي التعديل اليدوي فقط.
+            مثال: 1000 يعني طلب بـ 10,000 د.ع ياخذ 10 نقاط. خلّيه 0 إذا تريد التعديل اليدوي فقط.
           </p>
         </div>
         <div className="space-y-1.5">

@@ -15,10 +15,10 @@ export type LoyaltyConfig = {
   earning: {
     enabled: boolean;
     /**
-     * Integer points per 1 IQD of eligible order total.
-     * Keep at `0` until business approves a real rate — do not invent economics.
+     * IQD of eligible order total needed to earn 1 point
+     * (e.g. 1000 → a 10,000 IQD order earns 10 points). `0` = no auto earning.
      */
-    pointsPerCurrencyUnit: number;
+    iqdPerPoint: number;
   };
   redemption: {
     enabled: boolean;
@@ -110,7 +110,7 @@ export const DEFAULT_LOYALTY_CONFIG: LoyaltyConfig = {
   enabled: false,
   earning: {
     enabled: false,
-    pointsPerCurrencyUnit: 0,
+    iqdPerPoint: 0,
   },
   redemption: {
     enabled: false,

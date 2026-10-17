@@ -18,8 +18,8 @@ export function isOrderEligibleForEarning(order: Order): boolean {
 }
 
 /**
- * Integer points from eligible order total × configured rate.
- * Returns 0 when loyalty/earning disabled or rate is 0.
+ * Whole points: eligible order total ÷ IQD-per-point, rounded down.
+ * Returns 0 when loyalty/earning disabled or the rate is 0.
  * Never invents a commercial rate — uses config only.
  */
 export function calculateEarnedPoints(
@@ -29,11 +29,11 @@ export function calculateEarnedPoints(
   if (!config.enabled || !config.earning.enabled) return 0;
   if (!isOrderEligibleForEarning(order)) return 0;
 
-  const rate = Math.max(0, Math.trunc(config.earning.pointsPerCurrencyUnit));
-  if (rate <= 0) return 0;
+  const iqdPerPoint = Math.max(0, Math.trunc(config.earning.iqdPerPoint));
+  if (iqdPerPoint <= 0) return 0;
 
   const totalIqd = Math.max(0, Math.trunc(order.pricing.total));
-  return totalIqd * rate;
+  return Math.floor(totalIqd / iqdPerPoint);
 }
 
 export type RedeemValidation =

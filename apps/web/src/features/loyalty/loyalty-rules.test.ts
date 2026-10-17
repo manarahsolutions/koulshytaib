@@ -41,20 +41,20 @@ describe("loyalty earning rules", () => {
       calculateEarnedPoints(order, {
         ...DEFAULT_LOYALTY_CONFIG,
         enabled: true,
-        earning: { enabled: true, pointsPerCurrencyUnit: 0 },
+        earning: { enabled: true, iqdPerPoint: 0 },
       }),
     ).toBe(0);
   });
 
-  it("earns integer points from rate × total", () => {
+  it("earns one point per iqdPerPoint, rounded down", () => {
     const order = stubOrder("delivered", 5000);
     expect(
       calculateEarnedPoints(order, {
         ...DEFAULT_LOYALTY_CONFIG,
         enabled: true,
-        earning: { enabled: true, pointsPerCurrencyUnit: 1 },
+        earning: { enabled: true, iqdPerPoint: 1000 },
       }),
-    ).toBe(5000);
+    ).toBe(5);
   });
 
   it("maps transaction balance deltas", () => {

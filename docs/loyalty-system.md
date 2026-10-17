@@ -18,7 +18,7 @@ Loyalty is **not** keyed by phone string. Phone resolves to Customer first (Phas
 | --- | --- |
 | `enabled` | `false` |
 | `earning.enabled` | `false` |
-| `earning.pointsPerCurrencyUnit` | `0` |
+| `earning.iqdPerPoint` (IQD per 1 point; 0 = off) | `0` |
 | `redemption.enabled` | `false` |
 | `redemption.minimumPoints` | `0` |
 | `redemption.pointsPerCurrencyUnit` | `0` |

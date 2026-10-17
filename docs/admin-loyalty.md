@@ -27,7 +27,7 @@ Mutations go through `loyalty-service` only. Disabled system rejects with `LOYAL
 Displays actual fields:
 
 - master `enabled`
-- earning enabled + `pointsPerCurrencyUnit` (may be `0`)
+- earning enabled + `iqdPerPoint` (IQD per point, may be `0`)
 - redemption enabled + minimum + conversion rate (may be `0`)
 
 No economics editor. No invented rates.

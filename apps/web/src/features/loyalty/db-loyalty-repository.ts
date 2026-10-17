@@ -30,7 +30,31 @@ import type { Order } from "@/types/order";
 export async function dbGetLoyaltyConfig(): Promise<LoyaltyConfig> {
   const row = await prisma.appConfig.findUnique({ where: { id: "default" } });
   if (!row) return DEFAULT_LOYALTY_CONFIG;
-  return row.loyaltyJson as unknown as LoyaltyConfig;
+  return normalizeLoyaltyConfig(row.loyaltyJson);
+}
+
+/**
+ * Stored JSON may predate `earning.iqdPerPoint` (it used a points-per-IQD
+ * multiplier). The old value is dropped rather than converted, so earning
+ * stays off until a manager sets an explicit IQD-per-point rate.
+ */
+function normalizeLoyaltyConfig(raw: unknown): LoyaltyConfig {
+  const stored = (raw ?? {}) as Partial<LoyaltyConfig>;
+  const earning = (stored.earning ?? {}) as Partial<LoyaltyConfig["earning"]>;
+  return {
+    ...DEFAULT_LOYALTY_CONFIG,
+    ...stored,
+    earning: {
+      enabled: Boolean(earning.enabled),
+      iqdPerPoint: Number.isInteger(earning.iqdPerPoint)
+        ? Math.max(0, earning.iqdPerPoint as number)
+        : 0,
+    },
+    redemption: {
+      ...DEFAULT_LOYALTY_CONFIG.redemption,
+      ...stored.redemption,
+    },
+  };
 }
 
 export async function dbEnsureLoyaltyAccount(
