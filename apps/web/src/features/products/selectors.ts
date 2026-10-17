@@ -102,17 +102,27 @@ export function filterCustomerMenuProducts(input: {
   const q = normalizeArabicSearch(input.query ?? "");
   const categoryId = input.categoryId ?? "all";
 
-  return getVisibleProducts().filter((product) => {
-    if (categoryId !== "all" && product.categoryId !== categoryId) {
-      return false;
-    }
-    if (!q) return true;
-    const categoryName = getCategoryById(product.categoryId)?.name ?? "";
-    const haystack = normalizeArabicSearch(
-      `${product.name} ${product.description} ${categoryName}`,
+  // Product sortOrder is per category, so group by category order first.
+  const categoryOrder = (id: string) =>
+    getCategoryById(id)?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+
+  return getVisibleProducts()
+    .filter((product) => {
+      if (categoryId !== "all" && product.categoryId !== categoryId) {
+        return false;
+      }
+      if (!q) return true;
+      const categoryName = getCategoryById(product.categoryId)?.name ?? "";
+      const haystack = normalizeArabicSearch(
+        `${product.name} ${product.description} ${categoryName}`,
+      );
+      return haystack.includes(q);
+    })
+    .sort(
+      (a, b) =>
+        categoryOrder(a.categoryId) - categoryOrder(b.categoryId) ||
+        a.sortOrder - b.sortOrder,
     );
-    return haystack.includes(q);
-  });
 }
 
 export function getPopularProducts(): Product[] {
