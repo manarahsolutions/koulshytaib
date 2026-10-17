@@ -6,6 +6,10 @@ import { OffersSection } from "@/components/home/offers-section";
 import { PopularProductsSection } from "@/components/home/popular-products-section";
 import { ReelsSection } from "@/components/home/reels-section";
 import { toMarketingReel, dbListReels, dbEnsureReelThumbnails } from "@/features/reels/db-reel-repository";
+import {
+  dbListCategories,
+  dbListProducts,
+} from "@/features/products/db-catalog-repository";
 import { isDatabaseConfigured } from "@/lib/db/prisma";
 import {
   getFeaturedOffer,
@@ -15,6 +19,7 @@ import {
   getHomeCategories,
   getHomePopularProducts,
 } from "@/features/products/mock-data";
+import type { Category, Product } from "@/types/catalog";
 import type { Reel } from "@/types/marketing";
 import type { Metadata } from "next";
 
@@ -30,9 +35,45 @@ export const metadata: Metadata = {
   },
 };
 
+const HOME_POPULAR_LIMIT = 4;
+
+/**
+ * Popular slice from the dashboard catalog: products flagged "popular" first,
+ * then the rest in dashboard sort order.
+ */
+function pickPopularProducts(
+  categories: Category[],
+  products: Product[],
+): Product[] {
+  const visibleCategoryIds = new Set(categories.map((c) => c.id));
+  const browsable = products.filter(
+    (p) =>
+      p.visible !== false &&
+      p.available !== false &&
+      visibleCategoryIds.has(p.categoryId),
+  );
+  const flagged = browsable.filter((p) =>
+    p.badges?.some((b) => b.kind === "popular"),
+  );
+  const rest = browsable.filter((p) => !flagged.includes(p));
+  return [...flagged, ...rest].slice(0, HOME_POPULAR_LIMIT);
+}
+
 export default async function HomePage() {
-  const categories = getHomeCategories();
-  const popular = getHomePopularProducts();
+  let categories = getHomeCategories();
+  let popular = getHomePopularProducts();
+  if (isDatabaseConfigured()) {
+    try {
+      const [dbCategories, dbProducts] = await Promise.all([
+        dbListCategories(),
+        dbListProducts(),
+      ]);
+      categories = dbCategories.filter((c) => c.visible !== false);
+      popular = pickPopularProducts(categories, dbProducts);
+    } catch {
+      // Keep the seed catalog if the database is unreachable.
+    }
+  }
   const featured = getFeaturedOffer();
   const secondary = getSecondaryOffers();
 

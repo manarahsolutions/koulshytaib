@@ -260,6 +260,8 @@ export async function moveProductAction(
     await requireAdminDb();
     const data = await dbMoveProduct(id, direction);
     revalidatePath("/admin/products");
+    revalidatePath("/menu");
+    revalidatePath("/");
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "moveProduct");
