@@ -1,11 +1,7 @@
 import { DecorativeMotif } from "@/components/brand/decorative-motif";
 import { PageContainer } from "@/components/layout/page-container";
 import { OfferCard } from "@/components/marketing/offer-card";
-import {
-  getCustomerOffers,
-  getFeaturedOffer,
-  getSecondaryOffers,
-} from "@/features/offers/selectors";
+import { loadCustomerOffers } from "@/features/offers/server-customer-offers";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -16,10 +12,8 @@ export const metadata: Metadata = {
 /**
  * Customer offers listing — same OfferRepository as Homepage.
  */
-export default function OffersPage() {
-  const featured = getFeaturedOffer();
-  const secondary = getSecondaryOffers();
-  const all = getCustomerOffers();
+export default async function OffersPage() {
+  const { all, featured, secondary } = await loadCustomerOffers();
 
   if (all.length === 0) {
     return (

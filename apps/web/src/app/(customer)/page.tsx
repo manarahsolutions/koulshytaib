@@ -11,10 +11,7 @@ import {
   dbListProducts,
 } from "@/features/products/db-catalog-repository";
 import { isDatabaseConfigured } from "@/lib/db/prisma";
-import {
-  getFeaturedOffer,
-  getSecondaryOffers,
-} from "@/features/offers/selectors";
+import { loadCustomerOffers } from "@/features/offers/server-customer-offers";
 import {
   getHomeCategories,
   getHomePopularProducts,
@@ -62,20 +59,21 @@ function pickPopularProducts(
 export default async function HomePage() {
   let categories = getHomeCategories();
   let popular = getHomePopularProducts();
+  let catalog: { categories: Category[]; products: Product[] } | undefined;
   if (isDatabaseConfigured()) {
     try {
       const [dbCategories, dbProducts] = await Promise.all([
         dbListCategories(),
         dbListProducts(),
       ]);
+      catalog = { categories: dbCategories, products: dbProducts };
       categories = dbCategories.filter((c) => c.visible !== false);
       popular = pickPopularProducts(categories, dbProducts);
     } catch {
       // Keep the seed catalog if the database is unreachable.
     }
   }
-  const featured = getFeaturedOffer();
-  const secondary = getSecondaryOffers();
+  const { featured, secondary } = await loadCustomerOffers(catalog);
 
   let reels: Reel[] = [];
   if (isDatabaseConfigured()) {

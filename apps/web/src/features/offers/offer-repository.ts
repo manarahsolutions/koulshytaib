@@ -56,6 +56,12 @@ export function upsertOfferInCache(offer: Offer): void {
   emit();
 }
 
+/** Drop one offer from the client cache (after a DB delete, or in-memory). */
+export function removeOfferFromCache(id: string): void {
+  ensureOffersSeeded();
+  if (byId.delete(id)) emit();
+}
+
 export function subscribeOffers(onChange: () => void): () => void {
   ensureOffersSeeded();
   listeners.add(onChange);

@@ -10,8 +10,16 @@ import {
   getOfferById,
   listOffers,
 } from "@/features/offers/offer-repository";
+import {
+  buildCustomerOfferViews,
+  splitFeaturedOffer,
+} from "@/features/offers/customer-offer-views";
 import type { Offer } from "@/features/offers/types";
-import { getProductById } from "@/features/products/product-repository";
+import { listCategories } from "@/features/products/category-repository";
+import {
+  getProductById,
+  listProducts,
+} from "@/features/products/product-repository";
 import {
   isProductAvailable,
   isProductPubliclyBrowsable,
@@ -91,20 +99,19 @@ export function getActiveOffers(): Offer[] {
 }
 
 export function getCustomerOffers(): CustomerOfferView[] {
-  return listOffers()
-    .map(toCustomerOfferView)
-    .filter((v): v is CustomerOfferView => v != null);
+  return buildCustomerOfferViews(
+    listOffers(),
+    listProducts(),
+    listCategories(),
+  );
 }
 
 export function getFeaturedOffer(): CustomerOfferView | null {
-  const eligible = getCustomerOffers();
-  return eligible.find((v) => v.offer.featured) ?? eligible[0] ?? null;
+  return splitFeaturedOffer(getCustomerOffers()).featured;
 }
 
 export function getSecondaryOffers(): CustomerOfferView[] {
-  const featured = getFeaturedOffer();
-  if (!featured) return [];
-  return getCustomerOffers().filter((v) => v.offer.id !== featured.offer.id);
+  return splitFeaturedOffer(getCustomerOffers()).secondary;
 }
 
 export function getOffersByProduct(productId: string): Offer[] {
@@ -154,6 +161,9 @@ export function searchOffers(query: string): Offer[] {
 export function getOfferProductWarnings(offer: Offer): string[] {
   const { missingIds, existing } = resolveLinkedProducts(offer);
   const warnings: string[] = [];
+  if (offer.productIds.length === 0) {
+    warnings.push("العرض غير مربوط بأي منتج — ما يظهر للزبون لحد ما تختار منتج");
+  }
   if (missingIds.length > 0) {
     warnings.push("يوجد منتج مرتبط غير موجود");
   }

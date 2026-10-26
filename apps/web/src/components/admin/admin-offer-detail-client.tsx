@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  deleteOfferAction,
   fetchOffersAction,
   updateOfferAction,
 } from "@/app/actions/backend";
@@ -18,10 +19,11 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   getOfferById,
+  removeOfferFromCache,
   replaceOffersFromServer,
   upsertOfferInCache,
 } from "@/features/offers/offer-repository";
-import { updateOffer } from "@/features/offers/offer-service";
+import { deleteOffer, updateOffer } from "@/features/offers/offer-service";
 import { offerTypeLabel, resolveOfferPricing } from "@/features/offers/pricing";
 import {
   getOfferProductNames,
@@ -41,6 +43,8 @@ export function AdminOfferDetailClient() {
   const products = useProducts();
   const offer = getOfferById(params.id);
   const [toast, setToast] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!offer) {
     return (
@@ -62,6 +66,27 @@ export function AdminOfferDetailClient() {
     : null;
   const warnings = getOfferProductWarnings(offer);
 
+  const handleDelete = async () => {
+    if (deleting) return;
+    if (!window.confirm(`حذف العرض «${offer.title}» نهائياً؟`)) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await runAdminMutation({
+        db: () => deleteOfferAction(offer.id),
+        memory: () => deleteOffer(offer.id),
+        onDbSuccess: () => removeOfferFromCache(offer.id),
+      });
+      if (!result.ok) {
+        setDeleteError(result.message);
+        return;
+      }
+      router.push("/admin/offers");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -72,8 +97,27 @@ export function AdminOfferDetailClient() {
           <ArrowRight className="size-4" aria-hidden />
           رجوع للعروض
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-brand-navy">تعديل عرض</h1>
-        <p className="mt-1 text-sm text-text-muted">{offer.title}</p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-brand-navy">تعديل عرض</h1>
+            <p className="mt-1 text-sm text-text-muted">{offer.title}</p>
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            loading={deleting}
+            disabled={deleting}
+            onClick={() => void handleDelete()}
+          >
+            حذف العرض
+          </Button>
+        </div>
+        {deleteError ? (
+          <p className="mt-2 text-sm text-danger" role="alert">
+            {deleteError}
+          </p>
+        ) : null}
       </div>
 
       {toast ? (

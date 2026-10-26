@@ -259,6 +259,13 @@ export async function dbUpdateOffer(
   return mapOffer(row);
 }
 
+/** Permanently remove an offer; its product links cascade. Orders keep their own price snapshots. */
+export async function dbDeleteOffer(id: string): Promise<void> {
+  const existing = await prisma.offer.findUnique({ where: { id } });
+  if (!existing) throw new BackendError("NOT_FOUND", "ما لكينا هذا العرض");
+  await prisma.offer.delete({ where: { id } });
+}
+
 export async function dbMoveOffer(
   id: string,
   direction: "up" | "down",

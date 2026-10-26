@@ -7,6 +7,7 @@ import {
   getOfferById,
   listOffers,
   moveOffer as repoMoveOffer,
+  removeOfferFromCache,
   reorderOffers as repoReorderOffers,
   updateOffer as repoUpdateOffer,
 } from "@/features/offers/offer-repository";
@@ -91,6 +92,14 @@ export function moveOffer(
 
 export function reorderOffers(orderedIds: string[]): OfferResult<Offer[]> {
   return wrap(() => repoReorderOffers(orderedIds));
+}
+
+export function deleteOffer(id: string): OfferResult<{ id: string }> {
+  return wrap(() => {
+    if (!getOfferById(id)) throw new Error("OFFER_NOT_FOUND");
+    removeOfferFromCache(id);
+    return { id };
+  });
 }
 
 export { getOfferById, listOffers };

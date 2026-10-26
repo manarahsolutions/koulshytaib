@@ -20,6 +20,7 @@ import {
 } from "@/features/products/db-catalog-repository";
 import {
   dbCreateOffer,
+  dbDeleteOffer,
   dbGetOfferById,
   dbListOffers,
   dbMoveOffer,
@@ -389,11 +390,26 @@ export async function setOfferFeaturedAction(id: string, featured: boolean) {
   return updateOfferAction(id, { featured });
 }
 
+export async function deleteOfferAction(id: string) {
+  try {
+    await requireManagerDb();
+    await dbDeleteOffer(id);
+    revalidatePath("/admin/offers");
+    revalidatePath("/");
+    revalidatePath("/offers");
+    return { ok: true as const, data: { id } };
+  } catch (error) {
+    return fail(error, "deleteOffer");
+  }
+}
+
 export async function moveOfferAction(id: string, direction: "up" | "down") {
   try {
     await requireManagerDb();
     const data = await dbMoveOffer(id, direction);
     revalidatePath("/admin/offers");
+    revalidatePath("/");
+    revalidatePath("/offers");
     return { ok: true as const, data };
   } catch (error) {
     return fail(error, "moveOffer");
