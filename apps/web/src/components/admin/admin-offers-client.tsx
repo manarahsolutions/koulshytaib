@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  deleteOfferAction,
   fetchOffersAction,
   reorderOffersAction,
   setOfferActiveAction,
@@ -16,10 +17,12 @@ import { OfferCards, OfferTable } from "@/components/admin/offer-list";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  removeOfferFromCache,
   replaceOffersFromServer,
   upsertOfferInCache,
 } from "@/features/offers/offer-repository";
 import {
+  deleteOffer,
   reorderOffers,
   setOfferActive,
   setOfferFeatured,
@@ -44,7 +47,10 @@ export function AdminOffersClient() {
   const [status, setStatus] = useState<OfferListFilter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: "success" | "error";
+  } | null>(null);
 
   const allOffers = useOffers();
   const offers = useAdminOfferList({ query, status });
@@ -55,9 +61,18 @@ export function AdminOffersClient() {
     setStatus("all");
   };
 
-  const flash = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2200);
+  const flash = (message: string, tone: "success" | "error" = "success") => {
+    setToast({ message, tone });
+    window.setTimeout(() => setToast(null), tone === "error" ? 4000 : 2200);
+  };
+
+  /** Success message, or the server's error shown as an error. */
+  const report = (
+    result: { ok: true } | { ok: false; message: string },
+    success: string,
+  ) => {
+    if (result.ok) flash(success);
+    else flash(result.message, "error");
   };
 
   const withBusy = async (offer: Offer, fn: () => Promise<void>) => {
@@ -80,7 +95,7 @@ export function AdminOffersClient() {
             await refreshOffersCache();
           },
         });
-        flash(result.ok ? "تم تحديث ترتيب العروض" : result.message);
+        report(result, "تم تحديث ترتيب العروض");
       } finally {
         setReorderBusy(false);
       }
@@ -100,7 +115,7 @@ export function AdminOffersClient() {
           memory: () => setOfferActive(offer.id, !offer.active),
           onDbSuccess: (next) => upsertOfferInCache(next),
         });
-        flash(result.ok ? "تم تحديث العرض" : result.message);
+        report(result, "تم تحديث العرض");
       }),
     onToggleVisible: (offer: Offer) =>
       void withBusy(offer, async () => {
@@ -109,7 +124,17 @@ export function AdminOffersClient() {
           memory: () => setOfferVisibility(offer.id, !offer.visible),
           onDbSuccess: (next) => upsertOfferInCache(next),
         });
-        flash(result.ok ? "تم تحديث العرض" : result.message);
+        report(result, "تم تحديث العرض");
+      }),
+    onDelete: (offer: Offer) =>
+      void withBusy(offer, async () => {
+        if (!window.confirm(`حذف العرض «${offer.title}» نهائياً؟`)) return;
+        const result = await runAdminMutation({
+          db: () => deleteOfferAction(offer.id),
+          memory: () => deleteOffer(offer.id),
+          onDbSuccess: () => removeOfferFromCache(offer.id),
+        });
+        report(result, "تم حذف العرض");
       }),
     onToggleFeatured: (offer: Offer) =>
       void withBusy(offer, async () => {
@@ -120,7 +145,7 @@ export function AdminOffersClient() {
             await refreshOffersCache();
           },
         });
-        flash(result.ok ? "تم تحديث العرض" : result.message);
+        report(result, "تم تحديث العرض");
       }),
   };
 
@@ -143,11 +168,15 @@ export function AdminOffersClient() {
 
       {toast ? (
         <p
-          className="rounded-md border border-success/25 bg-success-subtle px-3 py-2 text-sm text-success"
-          role="status"
+          className={
+            toast.tone === "error"
+              ? "rounded-md border border-danger/25 bg-danger-subtle px-3 py-2 text-sm text-danger"
+              : "rounded-md border border-success/25 bg-success-subtle px-3 py-2 text-sm text-success"
+          }
+          role={toast.tone === "error" ? "alert" : "status"}
           aria-live="polite"
         >
-          {toast}
+          {toast.message}
         </p>
       ) : null}
 

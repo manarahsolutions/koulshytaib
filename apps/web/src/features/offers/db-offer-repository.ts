@@ -193,13 +193,24 @@ export async function dbUpdateOffer(
       ? input.originalPrice
       : existing.originalPrice ?? undefined;
 
-  await assertPricing({
-    type,
-    productIds,
-    discountPercent,
-    offerPrice,
-    originalPrice,
-  });
+  // Status-only edits (active / visible / featured / order) must work even on
+  // an incomplete offer; customers never see an offer without products.
+  const touchesContent =
+    input.type !== undefined ||
+    input.productIds !== undefined ||
+    input.discountPercent !== undefined ||
+    input.offerPrice !== undefined ||
+    input.originalPrice !== undefined;
+
+  if (touchesContent) {
+    await assertPricing({
+      type,
+      productIds,
+      discountPercent,
+      offerPrice,
+      originalPrice,
+    });
+  }
 
   const featured = input.featured ?? existing.featured;
 

@@ -8,6 +8,7 @@ import {
   Pencil,
   PlayCircle,
   Star,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ export type OfferListProps = {
   onToggleActive: (offer: Offer) => void;
   onToggleVisible: (offer: Offer) => void;
   onToggleFeatured: (offer: Offer) => void;
+  onDelete: (offer: Offer) => void;
   onReorder: (orderedIds: string[]) => void;
   busyId?: string | null;
   reorderBusy?: boolean;
@@ -62,6 +64,7 @@ export function OfferTable({
   onToggleActive,
   onToggleVisible,
   onToggleFeatured,
+  onDelete,
   onReorder,
   busyId,
   reorderBusy,
@@ -203,6 +206,15 @@ export function OfferTable({
                       disabled={busy}
                       onClick={() => onToggleFeatured(offer)}
                     />
+                    <IconButton
+                      aria-label={`حذف ${offer.title}`}
+                      icon={<Trash2 />}
+                      size="sm"
+                      variant="ghost"
+                      className="text-danger"
+                      disabled={busy}
+                      onClick={() => onDelete(offer)}
+                    />
                   </div>
                 </td>
               </tr>
@@ -222,6 +234,7 @@ export function OfferCards(props: OfferListProps) {
     onToggleActive,
     onToggleVisible,
     onToggleFeatured,
+    onDelete,
     onReorder,
     busyId,
     reorderBusy,
@@ -317,6 +330,15 @@ export function OfferCards(props: OfferListProps) {
                     variant="outline"
                     disabled={busy}
                     onClick={() => onToggleFeatured(offer)}
+                  />
+                  <IconButton
+                    aria-label={`حذف ${offer.title}`}
+                    icon={<Trash2 />}
+                    size="sm"
+                    variant="outline"
+                    className="text-danger"
+                    disabled={busy}
+                    onClick={() => onDelete(offer)}
                   />
                 </div>
               </div>
